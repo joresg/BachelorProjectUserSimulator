@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\kernel.cu||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\kernel.cu||{8B382828-6202-11D1-8870-0000F87579D2}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 1,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedHeight": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "kernel.cu",
+              "DocumentMoniker": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\kernel.cu",
+              "RelativeDocumentMoniker": "UserSimulator\\kernel.cu",
+              "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\kernel.cu",
+              "RelativeToolTip": "UserSimulator\\kernel.cu",
+              "ViewState": "AQIAAFcAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2024-06-12T12:50:31.461Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
