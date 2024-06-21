@@ -1,0 +1,3 @@
+﻿  UserSimulator.cpp
+C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(305,13): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  UserSimulator.vcxproj -> C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.exe
