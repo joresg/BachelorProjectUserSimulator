@@ -1,3 +1,7 @@
-﻿  UserSimulator.cpp
+﻿  FileManager.cpp
+  UserSimulator.cpp
 C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(305,13): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  Generating Code...
+     Creating library C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.lib and object C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.exp
+LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
   UserSimulator.vcxproj -> C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.exe

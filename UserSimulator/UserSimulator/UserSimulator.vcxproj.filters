@@ -14,7 +14,4 @@
     <ClInclude Include="UserSimulator.h" />
     <ClInclude Include="CUDAMatrix.h" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
 </Project>

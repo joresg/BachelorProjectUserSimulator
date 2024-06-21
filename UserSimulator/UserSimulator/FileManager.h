@@ -1,7 +1,7 @@
-#include <Eigen/Dense>
 #include <vector>
 #include <tuple>
 #include <map>
+#include <string>
 
 #pragma once
 class FileManager
