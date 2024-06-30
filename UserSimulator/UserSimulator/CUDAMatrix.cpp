@@ -10,8 +10,8 @@ CUDAMatrix::CUDAMatrix(int rows, int cols) : _rows(rows), _cols(cols), _underlyi
 }
 
 CUDAMatrix::~CUDAMatrix() {
-	//delete[] _underlyingMatrix;
 	delete[] _underlyingMatrix;
+	_underlyingMatrix = nullptr;
 }
 
 // Copy Constructor
@@ -34,31 +34,39 @@ double& CUDAMatrix::operator()(int row, int col) {
 }
 
 // old version
-//CUDAMatrix CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
-//	if(this == &inputMatrix) return *this;
-//
-//	this->_arrayForm = false;
-//	this->_cols = inputMatrix.GetColumns();
-//	this->_rows = inputMatrix.GetRows();
-//	if (!_underlyingMatrix) _underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
-//	std::copy(inputMatrix.GetUnderlyingMatrix(), inputMatrix.GetUnderlyingMatrix() + _rows * _cols, this->_underlyingMatrix);
-//
-//	return *this;
-//
-//}
-
 CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
-	std::swap(_rows, inputMatrix._rows);
-	std::swap(_cols, inputMatrix._cols);
-	std::swap(_underlyingMatrix, inputMatrix._underlyingMatrix);
-	// ???????????????????????????
-	delete[] _underlyingMatrix;
-	std::swap(_arrayForm, inputMatrix._arrayForm);
+	if(this == &inputMatrix) return *this;
+
+	this->_arrayForm = false;
+	this->_cols = inputMatrix.GetColumns();
+	this->_rows = inputMatrix.GetRows();
+	//if (!_underlyingMatrix) _underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
+
+	delete[] this->_underlyingMatrix;
+	_underlyingMatrix = new double[_rows * _cols];
+
+	std::copy(inputMatrix.GetUnderlyingMatrix(), inputMatrix.GetUnderlyingMatrix() + _rows * _cols, this->_underlyingMatrix);
+
 	return *this;
+
 }
+
+//CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
+//	std::swap(_rows, inputMatrix._rows);
+//	std::swap(_cols, inputMatrix._cols);
+//	std::swap(_underlyingMatrix, inputMatrix._underlyingMatrix);
+//	// ???????????????????????????
+//	delete[] _underlyingMatrix;
+//	_underlyingMatrix = nullptr;
+//
+//	std::swap(_arrayForm, inputMatrix._arrayForm);
+//	return *this;
+//}
 
 void CUDAMatrix::Resize(int rows, int columns) {
 	delete[] _underlyingMatrix; // Free the old memory
+	//_underlyingMatrix = nullptr;
+
 	_rows = rows;
 	_cols = columns;
 	//_underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));

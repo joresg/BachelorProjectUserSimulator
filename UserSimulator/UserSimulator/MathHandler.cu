@@ -149,27 +149,28 @@ CUDAMatrix transposeMatrix(CUDAMatrix inputMatrix) {
 }
 
 // Function to perform matrix multiplication using CUDA
-void matrixMultiply(CUDAMatrix mat1, CUDAMatrix mat2, double* matRes) {
+//void matrixMultiply(CUDAMatrix mat1, CUDAMatrix mat2, double* matRes) {
+void matrixMultiply(double* A, double* B, double* C, int mat1Rows, int mat1Cols, int mat2Rows, int mat2Cols, MatrixOperation op) {
 
     // Allocate memory on the GPU
     double* d_A, * d_B, * d_C;
-    cudaMalloc((void**)&d_A, mat1.GetRows() * mat1.GetColumns() * sizeof(double));
-    cudaMalloc((void**)&d_B, mat2.GetRows() * mat2.GetColumns() * sizeof(double));
-    cudaMalloc((void**)&d_C, mat1.GetRows() * mat2.GetColumns() * sizeof(double));
+    cudaMalloc((void**)&d_A, mat1Rows * mat1Cols * sizeof(double));
+    cudaMalloc((void**)&d_B, mat2Rows * mat2Cols * sizeof(double));
+    cudaMalloc((void**)&d_C, mat1Rows * mat2Cols * sizeof(double));
 
     // Copy matrices from host memory to GPU memory
-    cudaMemcpy(d_A, mat1.GetUnderlyingMatrix(), mat1.GetRows() * mat1.GetColumns() * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_B, mat2.GetUnderlyingMatrix(), mat2.GetRows() * mat2.GetColumns() * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_A, A, mat1Rows * mat1Cols * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, mat2Rows * mat2Cols * sizeof(double), cudaMemcpyHostToDevice);
 
     // Define the block size and grid size
     dim3 blockSize(16, 16);
-    dim3 gridSize((mat2.GetColumns() + blockSize.x - 1) / blockSize.x, (mat1.GetRows() + blockSize.y - 1) / blockSize.y);
+    dim3 gridSize((mat2Cols + blockSize.x - 1) / blockSize.x, (mat1Rows + blockSize.y - 1) / blockSize.y);
 
     // Launch the kernel
-    matrixMultiplyKernel << <gridSize, blockSize >> > (d_A, d_B, d_C, mat1.GetRows(), mat1.GetColumns(), mat2.GetColumns());
+    matrixMultiplyKernel << <gridSize, blockSize >> > (d_A, d_B, d_C, mat1Rows, mat1Cols, mat2Cols);
 
     // Copy the result matrix from GPU memory to host memory
-    cudaMemcpy(matRes, d_C, mat1.GetRows() * mat2.GetColumns() * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(C, d_C, mat1Rows * mat2Cols * sizeof(double), cudaMemcpyDeviceToHost);
 
     // Free GPU memory
     cudaFree(d_A);
@@ -262,6 +263,7 @@ CUDAMatrix& CUDAMatrix::operator+=(const CUDAMatrix& mat2) {
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
 
     delete[] this->_underlyingMatrix;
+    //this->_underlyingMatrix = nullptr;
     this->_underlyingMatrix = res;
     return *this;
 }
@@ -274,6 +276,7 @@ CUDAMatrix CUDAMatrix::operator-=(CUDAMatrix mat2) {
     double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
     delete[] this->_underlyingMatrix;
+    //this->_underlyingMatrix = nullptr;
     this->SetUnderlyingMatrix(res);
     return *this;
 }
@@ -328,7 +331,8 @@ CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
         matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
     }
     else {
-        matrixMultiply(*this, mat2, matRes);
+        //matrixMultiply(*this, mat2, matRes);
+        matrixMultiply(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), this->GetColumns(), mat2.GetRows(), mat2.GetColumns(), op);
     }
 
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());

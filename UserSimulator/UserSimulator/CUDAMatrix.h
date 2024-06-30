@@ -23,7 +23,10 @@ public:
 	void SetRows(int rows) { _rows = rows; }
 	void SetColumns(int columns) { _cols = columns; }
 	double* GetUnderlyingMatrix() const { return _underlyingMatrix; }
-	void SetUnderlyingMatrix(double* mat) { _underlyingMatrix = mat; }
+	void SetUnderlyingMatrix(double* mat) {
+		delete[] _underlyingMatrix;
+		_underlyingMatrix = mat;
+	}
 	void Resize(int rows, int columns);
 	static CUDAMatrix Zero(int rows, int columns);
 	CUDAMatrix Array();

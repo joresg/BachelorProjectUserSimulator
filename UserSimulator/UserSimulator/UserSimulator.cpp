@@ -436,38 +436,37 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		CUDAMatrix lossGrad = _outputValues[i] - oneHotEncodedLabels[i + 1]; // Gradient of softmax + cross-entropy
 
 		// Gradients for the output layer
-		//CUDAMatrix lossGradT = _mathHandler->TransposeMatrix(lossGrad);
 		outputWeightsGrad += _hiddenStepValues[i] * _mathHandler->TransposeMatrix(lossGrad);
-		//outputBiasGrad = outputBiasGrad + lossGrad;
+		outputBiasGrad = outputBiasGrad + lossGrad;
 
 		// Backpropagate into the hidden layer
-		//CUDAMatrix outputGrad = _mathHandler->TransposeMatrix(_weightsOutput) * lossGrad;
-		//CUDAMatrix hiddenGrad = outputGrad + _mathHandler->TransposeMatrix(_hiddenWeights) * nextHiddenGrad;
-		//CUDAMatrix tanhDerivative = _mathHandler->TanhDerivative(_hiddenStepValues[i]);
-		//hiddenGrad = hiddenGrad.Array() * tanhDerivative.Array();
+		CUDAMatrix outputGrad = _mathHandler->TransposeMatrix(_weightsOutput) * lossGrad;
+		CUDAMatrix hiddenGrad = outputGrad + _mathHandler->TransposeMatrix(_hiddenWeights) * nextHiddenGrad;
+		CUDAMatrix tanhDerivative = _mathHandler->TanhDerivative(_hiddenStepValues[i]);
+		hiddenGrad = hiddenGrad.Array() * tanhDerivative.Array();
 
 		// Accumulate gradients for hidden layer weights and biases
 		if (i > 0) {
-			//hiddenWeightsGrad = hiddenWeightsGrad + (_hiddenStepValues[i - 1] * _mathHandler->TransposeMatrix(hiddenGrad));
-			//hiddenBiasGrad = hiddenBiasGrad + hiddenGrad;
+			hiddenWeightsGrad = hiddenWeightsGrad + (_hiddenStepValues[i - 1] * _mathHandler->TransposeMatrix(hiddenGrad));
+			hiddenBiasGrad = hiddenBiasGrad + hiddenGrad;
 		}
 
 		// Accumulate gradients for input weights
-		//inputWeightsGrad = inputWeightsGrad + (oneHotEncodedLabels[i] * _mathHandler->TransposeMatrix(hiddenGrad));
+		inputWeightsGrad = inputWeightsGrad + (oneHotEncodedLabels[i] * _mathHandler->TransposeMatrix(hiddenGrad));
 
 		// Update nextHiddenGrad for the next iteration
-		//nextHiddenGrad = hiddenGrad;
+		nextHiddenGrad = hiddenGrad;
 	}
 
 	// Apply learning rate adjustment
 	double adjustedLearningRate = learningRate / _outputValues.size();
 
 	// Update weights and biases
-	/*_inputWeights = _inputWeights - (inputWeightsGrad * adjustedLearningRate);
+	_inputWeights = _inputWeights - (inputWeightsGrad * adjustedLearningRate);
 	_hiddenWeights = _hiddenWeights - (hiddenWeightsGrad * adjustedLearningRate);
 	_biasesHidden = _biasesHidden - (hiddenBiasGrad * adjustedLearningRate);
 	_weightsOutput = _weightsOutput - (outputWeightsGrad * adjustedLearningRate);
-	_biasesOutput = _biasesOutput - (outputBiasGrad * adjustedLearningRate);*/
+	_biasesOutput = _biasesOutput - (outputBiasGrad * adjustedLearningRate);
 }
 
 int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode) {
