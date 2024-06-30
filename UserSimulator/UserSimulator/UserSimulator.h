@@ -11,6 +11,7 @@ public:
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode);
 	void BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
 	MathHandler* GetMathEngine() { return _mathHandler; }
+	void PrintPredictedClassProbabilities();
 
 private:
 	MathHandler* _mathHandler;
@@ -26,7 +27,7 @@ private:
 
 	double _totalLoss;
 
-	std::vector<CUDAMatrix> _oneHotEncodedClicks;
+	//std::vector<CUDAMatrix> _oneHotEncodedClicks;
 
 	int _inputNeurons;
 	int _hiddenLayerNeurons;

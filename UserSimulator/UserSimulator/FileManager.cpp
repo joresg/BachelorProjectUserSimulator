@@ -46,10 +46,9 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 
 	std::ifstream infile(filePath);
 	std::string line;
-	int seqLength = 10;
+	int seqLength = 30;
 	int cmdID = -1;
 	int generatedID = 0;
-	int linesRead = 0;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
@@ -57,7 +56,6 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 	std::map<std::string, int> cmdIDs;
 
 	while (std::getline(infile, line)) {
-		if (linesRead > 1000) break;
 
 		// check if cmd already in map if not add with new ID
 
@@ -80,14 +78,12 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 			seq.push_back(cmdID);
 		}
 
-		if (seq.size() == 10) {
+		if (seq.size() == seqLength) {
 			allSequences.push_back(seq);
 			//seq.clear();
 		}
 
 		//std::cout << line << std::endl;
-
-		linesRead++;
 	}
 
 	return std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>>(allSequences, cmdIDs);

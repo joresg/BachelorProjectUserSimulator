@@ -1,18 +1,28 @@
 #include "CUDAMatrix.h"
 
-CUDAMatrix::CUDAMatrix() {
-	//_underlyingMatrix = NULL;
-	_underlyingMatrix = nullptr;
-	_rows = -1;
-	_cols = -1;
+CUDAMatrix::CUDAMatrix() : _rows(-1), _cols(-1), _underlyingMatrix(nullptr), _arrayForm(false) {}
+
+CUDAMatrix::CUDAMatrix(int rows, int cols) : _rows(rows), _cols(cols), _underlyingMatrix(new double[rows * cols]), _arrayForm(false) {
+	/*_underlyingMatrix = (double*)malloc(cols * rows * sizeof(double));
+	_rows = rows;
+	_cols = cols;*/
 	_arrayForm = false;
 }
 
-CUDAMatrix::CUDAMatrix(int rows, int cols) {
-	_underlyingMatrix = (double*)malloc(cols * rows * sizeof(double));
-	_rows = rows;
-	_cols = cols;
-	_arrayForm = false;
+CUDAMatrix::~CUDAMatrix() {
+	//delete[] _underlyingMatrix;
+	delete[] _underlyingMatrix;
+}
+
+// Copy Constructor
+//CUDAMatrix::CUDAMatrix(const CUDAMatrix& other) : _rows(other._rows), _cols(other._cols), _underlyingMatrix(new double[other._rows * other._cols]), _arrayForm(other._arrayForm) {
+//	if (!_underlyingMatrix) _underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
+//	std::copy(other._underlyingMatrix, other._underlyingMatrix + other._rows * other._cols, this->_underlyingMatrix);
+//}
+
+CUDAMatrix::CUDAMatrix(const CUDAMatrix& other)
+	: _rows(other._rows), _cols(other._cols), _underlyingMatrix(new double[other._rows * other._cols]), _arrayForm(other._arrayForm) {
+	std::copy(other._underlyingMatrix, other._underlyingMatrix + other._rows * other._cols, _underlyingMatrix);
 }
 
 double& CUDAMatrix::operator()(int row, int col) {
@@ -21,28 +31,38 @@ double& CUDAMatrix::operator()(int row, int col) {
 	}
 
 	return _underlyingMatrix[row * _cols + col];
-	printf("FUCK %f\n", _underlyingMatrix[row * _cols + col]);
 }
 
-CUDAMatrix CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
-	if(this == &inputMatrix) return *this;
+// old version
+//CUDAMatrix CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
+//	if(this == &inputMatrix) return *this;
+//
+//	this->_arrayForm = false;
+//	this->_cols = inputMatrix.GetColumns();
+//	this->_rows = inputMatrix.GetRows();
+//	if (!_underlyingMatrix) _underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
+//	std::copy(inputMatrix.GetUnderlyingMatrix(), inputMatrix.GetUnderlyingMatrix() + _rows * _cols, this->_underlyingMatrix);
+//
+//	return *this;
+//
+//}
 
-	this->_arrayForm = false;
-	this->_cols = inputMatrix.GetColumns();
-	this->_rows = inputMatrix.GetRows();
-	if (_underlyingMatrix == 0) _underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
-	std::copy(inputMatrix.GetUnderlyingMatrix(), inputMatrix.GetUnderlyingMatrix() + _rows * _cols, this->_underlyingMatrix);
-
+CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
+	std::swap(_rows, inputMatrix._rows);
+	std::swap(_cols, inputMatrix._cols);
+	std::swap(_underlyingMatrix, inputMatrix._underlyingMatrix);
+	// ???????????????????????????
+	delete[] _underlyingMatrix;
+	std::swap(_arrayForm, inputMatrix._arrayForm);
 	return *this;
-
 }
 
 void CUDAMatrix::Resize(int rows, int columns) {
+	delete[] _underlyingMatrix; // Free the old memory
 	_rows = rows;
 	_cols = columns;
-	//if (_underlyingMatrix) free(_underlyingMatrix);
-	_underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
-	//_underlyingMatrix = (double*)realloc(_underlyingMatrix, _rows * _cols * sizeof(double));
+	//_underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
+	_underlyingMatrix = new double[rows * columns];
 }
 
 void CUDAMatrix::Print() {
@@ -57,8 +77,12 @@ void CUDAMatrix::Print() {
 }
 
 CUDAMatrix CUDAMatrix::Zero(int rows, int columns) {
-	CUDAMatrix newMatrix(rows, columns);
+	/*CUDAMatrix newMatrix(rows, columns);
 	memset(newMatrix._underlyingMatrix, 0, newMatrix._rows * newMatrix._cols * sizeof(double));
+	return newMatrix;*/
+
+	CUDAMatrix newMatrix(rows, columns);
+	std::fill(newMatrix._underlyingMatrix, newMatrix._underlyingMatrix + rows * columns, 0.0);
 	return newMatrix;
 }
 
@@ -67,12 +91,17 @@ CUDAMatrix CUDAMatrix::Array() {
 	//_arrayForm = true;
 	//return *this;
 
-	CUDAMatrix res(this->_rows, this->_cols);
+	/*CUDAMatrix res(this->_rows, this->_cols);
 	res._arrayForm = true;
 	res.SetUnderlyingMatrix(this->GetUnderlyingMatrix());
+	return res;*/
+
+	CUDAMatrix res = *this;
+	res._arrayForm = true;
 	return res;
 }
 
 void CUDAMatrix::Destroy() {
-	if(_underlyingMatrix) free(_underlyingMatrix);
+	delete[] _underlyingMatrix;
+	_underlyingMatrix = nullptr;
 }

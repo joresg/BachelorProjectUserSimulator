@@ -2,6 +2,8 @@
 #include <tuple>
 #include <map>
 #include <string>
+#include <iostream>
+#include <sstream>	
 
 #pragma once
 class FileManager

@@ -17,11 +17,10 @@ public:
 	double GenerateRandomNumber(double min, double max);
 	CUDAMatrix TanhDerivative(CUDAMatrix inputMatrix);
 	std::default_random_engine GetRandomEngine() { return _re; }
+	std::vector<CUDAMatrix> CreateOneHotEncodedVector(std::vector<int> cmdIDs, int allClasses);
 private:
 	unsigned long _randSeed;
 	std::uniform_real_distribution<double> _unif;
 	std::default_random_engine _re;
 	dim3 _blockSize;
 };
-
-//cudaError_t addWithCuda(double* c, const double* a, const double* b, unsigned int size);

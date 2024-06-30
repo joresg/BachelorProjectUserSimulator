@@ -118,7 +118,8 @@ CUDAMatrix transposeMatrix(CUDAMatrix inputMatrix) {
     double* d_in, * d_out;
     //size_t size = width * height * sizeof(float);
     size_t size = inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double);
-    double* resUnderlying = (double*)malloc(size);
+    //double* resUnderlying = (double*)malloc(size);
+    double* resUnderlying = new double[size];
 
     // Allocate device memory
     CHECK_CUDA_ERROR(cudaMalloc(&d_in, size));
@@ -240,11 +241,49 @@ CUDAMatrix MathHandler::TransposeMatrix(CUDAMatrix inputMatrix) {
 #pragma endregion
 
 #pragma region operator overloads
+CUDAMatrix& CUDAMatrix::operator+=(const CUDAMatrix& mat2) {
+    //if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+    //this->_arrayForm = false;
+    //MatrixOperation op = Add;
+    ////double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    //double* res = new double[this->GetRows() * mat2.GetColumns()];
+    //matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+    //delete[] this->_underlyingMatrix;
+    ////CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
+    //this->SetUnderlyingMatrix(res);
+    //return *this;
+
+    if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) {
+        throw std::invalid_argument("matrix addition dimensions incorrect!");
+    }
+    this->_arrayForm = false;
+    MatrixOperation op = Add;
+    double* res = new double[this->GetRows() * mat2.GetColumns()];
+    matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+
+    delete[] this->_underlyingMatrix;
+    this->_underlyingMatrix = res;
+    return *this;
+}
+
+CUDAMatrix CUDAMatrix::operator-=(CUDAMatrix mat2) {
+    if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+    this->_arrayForm = false;
+    MatrixOperation op = Substract;
+    //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    double* res = new double[this->GetRows() * mat2.GetColumns()];
+    matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+    delete[] this->_underlyingMatrix;
+    this->SetUnderlyingMatrix(res);
+    return *this;
+}
+
 CUDAMatrix CUDAMatrix::operator-(CUDAMatrix mat2) {
     if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
 
     MatrixOperation op = Substract;
-    double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
     resMatrix.SetUnderlyingMatrix(res);
@@ -255,31 +294,53 @@ CUDAMatrix CUDAMatrix::operator+(CUDAMatrix mat2) {
     if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
 
     MatrixOperation op = Add;
-    double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
     resMatrix.SetUnderlyingMatrix(res);
     return resMatrix;
 }
 
-CUDAMatrix CUDAMatrix::operator*(CUDAMatrix mat2) {
-    if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
+    //if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+
+    //MatrixOperation op = Multiply;
+    ////double* matRes = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    //double* matRes = new double[this->GetRows() * mat2.GetColumns()];
+
+    //// TODO FIGURE OUT IF ELEMENT WISE OR NOT
+
+    //if (this->_arrayForm && mat2._arrayForm) matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
+    //else matrixMultiply(*this, mat2, matRes);
+    //CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
+    //resMatrix.SetUnderlyingMatrix(matRes);
+    //return resMatrix;
+
+    if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) {
+        throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+    }
 
     MatrixOperation op = Multiply;
-    double* matRes = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
+    double* matRes = new double[this->GetRows() * mat2.GetColumns()];
 
-    // TODO FIGURE OUT IF ELEMENT WISE OR NOT
+    if (this->_arrayForm && mat2._arrayForm) {
+        matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
+    }
+    else {
+        matrixMultiply(*this, mat2, matRes);
+    }
 
-    if (this->_arrayForm && mat2._arrayForm) matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
-    else matrixMultiply(*this, mat2, matRes);
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
     return resMatrix;
+
 }
 
 CUDAMatrix CUDAMatrix::operator*(double constValue) {
     MatrixOperation op = Multiply;
-    double* matRes = (double*)malloc(this->GetRows() * this->GetColumns() * sizeof(double));
+    //double* matRes = (double*)malloc(this->GetRows() * this->GetColumns() * sizeof(double));
+    double* matRes = new double[this->GetRows() * this->GetColumns() * sizeof(double)];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
@@ -295,10 +356,31 @@ double MathHandler::GenerateRandomNumber(double lowerBound, double upperBound) {
 
 CUDAMatrix MathHandler::TanhDerivative(CUDAMatrix inputMatrix) {
     MatrixOperation op = SquaredSubstractInvert;
-    double* matRes = (double*)malloc(inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double));
+    //double* matRes = (double*)malloc(inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double));
+    double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double)];
     matrixElementWiseOperations(inputMatrix.GetUnderlyingMatrix(), 1, matRes, inputMatrix.GetRows(), inputMatrix.GetColumns(), op);
     CUDAMatrix resMatrix(inputMatrix.GetRows(), inputMatrix.GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
     return resMatrix;
+}
+
+std::vector<CUDAMatrix> MathHandler::CreateOneHotEncodedVector(std::vector<int> cmdIDs, int allClasses) {
+
+    std::vector<CUDAMatrix> oneHotEncodedClicks;
+
+    for (int i = 0; i < cmdIDs.size(); i++)
+    {
+        CUDAMatrix oneHotEncodedLabel(allClasses, 1);
+        //oneHotEncodedClicks.push_back(CUDAMatrix(allClasses, 1));
+
+        for (int j = 0; j < allClasses; j++) {
+            oneHotEncodedLabel(j, 0) = cmdIDs[i] == j ? 1.0 : 0;
+            //oneHotEncodedClicks[oneHotEncodedClicks.size() - 1](j, 0) = cmdIDs[i] == j ? 1.0 : 0;
+        }
+
+        oneHotEncodedClicks.push_back(oneHotEncodedLabel);
+    }
+
+    return oneHotEncodedClicks;
 }
 #pragma endregion
