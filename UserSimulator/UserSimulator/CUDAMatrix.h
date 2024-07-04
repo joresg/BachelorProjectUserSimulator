@@ -39,6 +39,7 @@ public:
 	CUDAMatrix operator+(CUDAMatrix mat2);
 	CUDAMatrix operator*(const CUDAMatrix& mat2) const;
 	CUDAMatrix operator*(double constValue);
+	CUDAMatrix operator/(double constValue);
 	CUDAMatrix& operator=(CUDAMatrix mat2);
 	CUDAMatrix& operator+=(const CUDAMatrix& mat2);
 	CUDAMatrix operator-=(CUDAMatrix mat2);

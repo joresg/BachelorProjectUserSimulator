@@ -53,7 +53,7 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 	//int seqOverlap = 15;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = 500;
+	int limitLines = -1;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
@@ -71,11 +71,8 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 		}
 		else {
 			cmdID = generatedID;
-
 			cmdIDs.insert({ line, cmdID });
-
 			generatedID++;
-
 		}
 
 		if (seq.size() < seqLength) seq.push_back(cmdID);

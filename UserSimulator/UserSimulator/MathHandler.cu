@@ -1,5 +1,10 @@
 #include "MathHandler.cuh"
 
+//#include <iostream>
+//#include <vector>
+//#include <algorithm>
+//#include <cfloat>
+
 #define CHECK_CUDA_ERROR(call) \
     do { \
         cudaError_t err = call; \
@@ -13,7 +18,7 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 
 }
 
-enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert};
+enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp};
 
 #pragma region CUDA kernels
 // CUDA kernel to apply tanh to each element of the matrix
@@ -72,6 +77,8 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
     if (row < numRows && col < numCols) {
         int index = row * numCols + col;
         if (op == Substract) C[index] = A[index] - constValue;
+        else if (op == Divide) C[index] = A[index] / constValue;
+        else if (op == DivideExp) C[index] = std::exp(A[index]) / constValue;
         else if (op == Add) C[index] = A[index] + constValue;
         else if (op == Multiply) C[index] = A[index] * constValue;
         else if (op == SubstractInvert) C[index] = -(A[index] - constValue);
@@ -340,6 +347,15 @@ CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
 CUDAMatrix CUDAMatrix::operator*(double constValue) {
     MatrixOperation op = Multiply;
     //double* matRes = (double*)malloc(this->GetRows() * this->GetColumns() * sizeof(double));
+    double* matRes = new double[this->GetRows() * this->GetColumns() * sizeof(double)];
+    matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
+    CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+}
+
+CUDAMatrix CUDAMatrix::operator/(double constValue) {
+    MatrixOperation op = DivideExp;
     double* matRes = new double[this->GetRows() * this->GetColumns() * sizeof(double)];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());

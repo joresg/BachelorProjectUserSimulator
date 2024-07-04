@@ -3,20 +3,20 @@
   "WorkspaceRootPath": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\FileManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
-      "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\FileManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\UserSimulator.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\UserSimulator.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cu||{8B382828-6202-11D1-8870-0000F87579D2}|",
-      "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\MathHandler.cu||{8B382828-6202-11D1-8870-0000F87579D2}|"
+      "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\FileManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
+      "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\FileManager.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\CUDAMatrix.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\CUDAMatrix.cpp||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cu||{8B382828-6202-11D1-8870-0000F87579D2}|",
+      "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\MathHandler.cu||{8B382828-6202-11D1-8870-0000F87579D2}|"
     },
     {
       "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cuh||{8B382828-6202-11D1-8870-0000F87579D2}",
@@ -33,6 +33,9 @@
     {
       "AbsoluteMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\FileManager.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}",
       "RelativeMoniker": "D:0:0:{7D2B8794-3817-418B-8600-104052DC6504}|UserSimulator\\UserSimulator.vcxproj|solutionrelative:UserSimulator\\FileManager.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.5\\include\\device_functions.h||{D0E1A5C6-B359-4E41-9B60-3365922C2A22}"
     }
   ],
   "DocumentGroupContainers": [
@@ -42,8 +45,20 @@
       "DocumentGroups": [
         {
           "DockedWidth": 150,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 3,
           "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "device_functions.h",
+              "DocumentMoniker": "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.5\\include\\device_functions.h",
+              "RelativeDocumentMoniker": "..\\..\\..\\..\\..\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.5\\include\\device_functions.h",
+              "ToolTip": "C:\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.5\\include\\device_functions.h",
+              "RelativeToolTip": "..\\..\\..\\..\\..\\Program Files\\NVIDIA GPU Computing Toolkit\\CUDA\\v12.5\\include\\device_functions.h",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
+              "WhenOpened": "2024-07-04T16:25:39.162Z"
+            },
             {
               "$type": "Document",
               "DocumentIndex": 6,
@@ -54,8 +69,7 @@
               "RelativeToolTip": "UserSimulator\\UserSimulator.h",
               "ViewState": "AQIAAAAAAAAAAAAAAAAAABUAAAAZAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
-              "WhenOpened": "2024-06-12T13:28:55.633Z",
-              "EditorCaption": ""
+              "WhenOpened": "2024-06-12T13:28:55.633Z"
             },
             {
               "$type": "Document",
@@ -65,7 +79,7 @@
               "RelativeDocumentMoniker": "UserSimulator\\CUDAMatrix.h",
               "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\CUDAMatrix.h",
               "RelativeToolTip": "UserSimulator\\CUDAMatrix.h",
-              "ViewState": "AQIAAAEAAAAAAAAAAAASwBgAAAA5AAAA",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAACsAAAAwAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000680|",
               "WhenOpened": "2024-06-14T14:05:32.398Z",
               "EditorCaption": ""
@@ -78,7 +92,7 @@
               "RelativeDocumentMoniker": "UserSimulator\\MathHandler.cuh",
               "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cuh",
               "RelativeToolTip": "UserSimulator\\MathHandler.cuh",
-              "ViewState": "AQIAAAAAAAAAAAAAAAAAABIAAAA9AAAA",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAAABQAAAAPAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2024-06-12T13:33:27.051Z",
               "EditorCaption": ""
@@ -99,56 +113,56 @@
         },
         {
           "DockedWidth": 250,
-          "SelectedChildIndex": 3,
+          "SelectedChildIndex": 0,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "UserSimulator.cpp",
               "DocumentMoniker": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\UserSimulator.cpp",
               "RelativeDocumentMoniker": "UserSimulator\\UserSimulator.cpp",
               "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\UserSimulator.cpp",
               "RelativeToolTip": "UserSimulator\\UserSimulator.cpp",
-              "ViewState": "AQIAAJgAAAAAAAAAAAAowL4AAAATAAAA",
+              "ViewState": "AQIAALwAAAAAAAAAAAAqwM4AAAAQAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-06-12T13:29:01.073Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 3,
               "Title": "MathHandler.cu",
               "DocumentMoniker": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cu",
               "RelativeDocumentMoniker": "UserSimulator\\MathHandler.cu",
               "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cu",
               "RelativeToolTip": "UserSimulator\\MathHandler.cu",
-              "ViewState": "AQIAAFEBAAAAAAAAAAAowG4BAABXAAAA",
+              "ViewState": "AQIAACwAAAAAAAAAAAAqwEwAAAAkAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
               "WhenOpened": "2024-06-26T08:58:43.727Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 2,
               "Title": "CUDAMatrix.cpp",
               "DocumentMoniker": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\CUDAMatrix.cpp",
               "RelativeDocumentMoniker": "UserSimulator\\CUDAMatrix.cpp",
               "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\CUDAMatrix.cpp",
               "RelativeToolTip": "UserSimulator\\CUDAMatrix.cpp",
-              "ViewState": "AQIAAAAAAAAAAAAAAAAAABgAAAAXAAAA",
+              "ViewState": "AQIAAAAAAAAAAAAAAAAowBoAAAAAAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-06-14T14:05:43.329Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "FileManager.cpp",
               "DocumentMoniker": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\FileManager.cpp",
               "RelativeDocumentMoniker": "UserSimulator\\FileManager.cpp",
               "ToolTip": "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\FileManager.cpp",
               "RelativeToolTip": "UserSimulator\\FileManager.cpp",
-              "ViewState": "AQIAAD0AAAAAAAAAAAAowGEAAAAkAAAA",
+              "ViewState": "AQIAADwAAAAAAAAAAAAqwGgAAAAAAAAA",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000677|",
               "WhenOpened": "2024-06-15T21:14:03.473Z",
               "EditorCaption": ""

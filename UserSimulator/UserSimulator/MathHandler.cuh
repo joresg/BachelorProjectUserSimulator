@@ -1,6 +1,6 @@
-#include "cuda_runtime.h"
+//#include "cuda_runtime.h"
+#include <cuda_runtime.h>
 #include "device_launch_parameters.h"
-
 #include "CUDAMatrix.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +8,10 @@
 #include <random>
 #include <math.h>
 #include <stdexcept>
+
+//#include <cuda_runtime.h>
+//#include <algorithm>
+//#include <vector>
 
 #pragma once
 class MathHandler {

@@ -126,6 +126,13 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 	mat2.Print();
 	mat3.Print();
 	mat4.Print();
+
+	CUDAMatrix mat5(5, 1);
+	mat5(0, 0) = 0.4;
+	mat5(1, 0) = 0.7;
+	mat5(2, 0) = 3.2;
+	mat5(3, 0) = 1.1;
+	mat5(4, 0) = 0.9;
 }
 
 int main() {
@@ -138,7 +145,8 @@ int main() {
 	std::vector<std::vector<int>> allSequencesFromFile;
 	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
 
-	readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\unixCommandData)", true);
+	//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\unixCommandData)", true);
+	readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\randomData)", true);
 	allSequencesFromFile = std::get<0>(readFileRes);
 	std::map<std::string, int> commandIDsMap = std::get<1>(readFileRes);
 
@@ -149,10 +157,10 @@ int main() {
 
 	int allClasses = commandIDsMap.size();
 	//int allClasses = 5;
-	double learningRate = 0.1;
+	double learningRate = 0.001;
 	int inputNeurons = allClasses;
 	int outputNeurons = allClasses;
-	int hiddenNeurons = allClasses / 2;
+	int hiddenNeurons = allClasses;
 
 	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate);
 
@@ -196,7 +204,7 @@ int main() {
 
 	// train and test
 
-	int epochs = 1;
+	int epochs = 40;
 	for (int i = 0; i < epochs; i++) {
 		std::cout << "EPOCH: " << i << std::endl;
 		if (verboseMode)
@@ -219,6 +227,8 @@ int main() {
 			if (k > 0 && k % (int)(allSequencesFromFile.size() * 0.1) == 0) {
 				std::cout << (k / (int)(allSequencesFromFile.size() * 0.1)) * 10 << "%" << std::endl;
 			}
+			//printf("iteration: %d\n", k);
+
 			userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode);
 		}
 
@@ -430,9 +440,12 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 	//outputValuesActivated = outputValues;
 	CUDAMatrix outputValuesActivated(outputValuesUnactivated.GetRows(), 1);
 
-	for (int i = 0; i < outputValuesActivated.GetRows(); i++) {
+	// use CUDA instead
+	/*for (int i = 0; i < outputValuesActivated.GetRows(); i++) {
 		outputValuesActivated(i, 0) = std::exp(outputValuesUnactivated(i, 0)) / sumForSoftmax;
-	}
+	}*/
+
+	outputValuesActivated = outputValuesUnactivated / sumForSoftmax;
 
 	//std::cout << "PREDICTED: " << std::endl << outputValuesActivated << std::endl;
 
@@ -486,6 +499,7 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		CUDAMatrix outputGrad = _mathHandler->TransposeMatrix(_weightsOutput) * lossGrad;
 		CUDAMatrix hiddenGrad = outputGrad + _mathHandler->TransposeMatrix(_hiddenWeights) * nextHiddenGrad;
 		CUDAMatrix tanhDerivative = _mathHandler->TanhDerivative(_hiddenStepValues[i]);
+
 		hiddenGrad = hiddenGrad.Array() * tanhDerivative.Array();
 
 		// Accumulate gradients for hidden layer weights and biases
