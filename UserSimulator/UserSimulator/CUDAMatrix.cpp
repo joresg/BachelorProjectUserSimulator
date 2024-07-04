@@ -3,10 +3,7 @@
 CUDAMatrix::CUDAMatrix() : _rows(-1), _cols(-1), _underlyingMatrix(nullptr), _arrayForm(false) {}
 
 CUDAMatrix::CUDAMatrix(int rows, int cols) : _rows(rows), _cols(cols), _underlyingMatrix(new double[rows * cols]), _arrayForm(false) {
-	/*_underlyingMatrix = (double*)malloc(cols * rows * sizeof(double));
-	_rows = rows;
-	_cols = cols;*/
-	_arrayForm = false;
+
 }
 
 CUDAMatrix::~CUDAMatrix() {
@@ -69,7 +66,6 @@ void CUDAMatrix::Resize(int rows, int columns) {
 
 	_rows = rows;
 	_cols = columns;
-	//_underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
 	_underlyingMatrix = new double[rows * columns];
 }
 
@@ -95,15 +91,6 @@ CUDAMatrix CUDAMatrix::Zero(int rows, int columns) {
 }
 
 CUDAMatrix CUDAMatrix::Array() {
-	// TODO OPTIMIZE
-	//_arrayForm = true;
-	//return *this;
-
-	/*CUDAMatrix res(this->_rows, this->_cols);
-	res._arrayForm = true;
-	res.SetUnderlyingMatrix(this->GetUnderlyingMatrix());
-	return res;*/
-
 	CUDAMatrix res = *this;
 	res._arrayForm = true;
 	return res;

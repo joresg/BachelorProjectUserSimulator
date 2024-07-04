@@ -24,6 +24,7 @@ private:
 
 	std::vector<CUDAMatrix> _hiddenStepValues;
 	std::vector<CUDAMatrix> _outputValues;
+	std::vector<CUDAMatrix> _oneHotEncodedClicks;
 
 	double _totalLoss;
 

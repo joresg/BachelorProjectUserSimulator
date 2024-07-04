@@ -261,10 +261,7 @@ CUDAMatrix& CUDAMatrix::operator+=(const CUDAMatrix& mat2) {
     MatrixOperation op = Add;
     double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
-
-    delete[] this->_underlyingMatrix;
-    //this->_underlyingMatrix = nullptr;
-    this->_underlyingMatrix = res;
+    this->SetUnderlyingMatrix(res);
     return *this;
 }
 
@@ -275,7 +272,6 @@ CUDAMatrix CUDAMatrix::operator-=(CUDAMatrix mat2) {
     //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
     double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
-    delete[] this->_underlyingMatrix;
     //this->_underlyingMatrix = nullptr;
     this->SetUnderlyingMatrix(res);
     return *this;

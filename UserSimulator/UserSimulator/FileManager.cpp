@@ -46,16 +46,23 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 
 	std::ifstream infile(filePath);
 	std::string line;
-	int seqLength = 30;
+	//int seqLength = 20;
+	//int seqOverlap = 19;
+	int seqLength = 20;
+	int seqOverlap = seqLength - 1;
+	//int seqOverlap = 15;
 	int cmdID = -1;
 	int generatedID = 0;
+	int limitLines = 500;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
 	std::vector<int> seq;
+	std::vector<int> seqOverlapVec;
 	std::map<std::string, int> cmdIDs;
 
 	while (std::getline(infile, line)) {
+		if (limitLines == 0) break;
 
 		// check if cmd already in map if not add with new ID
 
@@ -65,7 +72,7 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 		else {
 			cmdID = generatedID;
 
-			cmdIDs.insert({ line, generatedID });
+			cmdIDs.insert({ line, cmdID });
 
 			generatedID++;
 
@@ -73,17 +80,29 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 
 		if (seq.size() < seqLength) seq.push_back(cmdID);
 		else {
-			// delete first and add last
-			seq.erase(seq.begin());
+			//// delete first and add last
+			//seq.erase(seq.begin());
+			//seq.push_back(cmdID);
+
+			allSequences.push_back(seq);
+
+			seqOverlapVec.clear();
+
+			for (int i = seq.size() - seqOverlap; i < seq.size(); i++) {
+				seqOverlapVec.push_back(seq[i]);
+			}
+
+			seq.clear();
+
+			/*for (int i = 0; i < seqOverlapVec.size(); i++) {
+				seq.push_back(seqOverlapVec[i]);
+			}*/
+
+			for (auto i : seqOverlapVec) seq.push_back(i);
 			seq.push_back(cmdID);
 		}
 
-		if (seq.size() == seqLength) {
-			allSequences.push_back(seq);
-			//seq.clear();
-		}
-
-		//std::cout << line << std::endl;
+		limitLines--;
 	}
 
 	return std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>>(allSequences, cmdIDs);
