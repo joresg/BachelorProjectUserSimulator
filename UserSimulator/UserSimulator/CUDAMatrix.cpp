@@ -96,6 +96,14 @@ CUDAMatrix CUDAMatrix::Array() {
 	return res;
 }
 
+CUDAMatrix CUDAMatrix::ClipByNorm(double maxNorm) {
+	double norm = this->Norm(); // Assuming Norm() calculates the Frobenius norm
+	if (norm > maxNorm) {
+		return (*this) * (maxNorm / norm);
+	}
+	return *this;
+}
+
 void CUDAMatrix::Destroy() {
 	delete[] _underlyingMatrix;
 	_underlyingMatrix = nullptr;

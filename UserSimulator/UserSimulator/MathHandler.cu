@@ -18,9 +18,36 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 
 }
 
-enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp};
+enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector};
 
 #pragma region CUDA kernels
+// row average and set every element of that row to this value
+__global__ void setRowAverage(double* matrix, int M, int N) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row < M) {
+        double sum = 0.0;
+        for (int col = 0; col < N; ++col) {
+            sum += matrix[row * N + col];
+        }
+        double avg = sum / N;
+        for (int col = 0; col < N; ++col) {
+            matrix[row * N + col] = avg;
+        }
+    }
+}
+
+// computre row averages of matrix MxN and return row vector Mx1
+__global__ void rowAverage(const double* matrix, double* rowAvg, int M, int N) {
+    int row = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row < M) {
+        double sum = 0.0;
+        for (int col = 0; col < N; ++col) {
+            sum += matrix[row * N + col];
+        }
+        rowAvg[row] = sum / N;
+    }
+}
+
 // CUDA kernel to apply tanh to each element of the matrix
 __global__ void tanhKernel(double* d_matrix, int width, int height) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
@@ -67,6 +94,7 @@ __global__ void matrixElementWiseKernel(double* A, double* B, double* C, int num
         if (op == Substract) C[index] = A[index] - B[index];
         else if (op == Add) C[index] = A[index] + B[index];
         else if (op == Multiply) C[index] = A[index] * B[index];
+        else if (op == Divide) C[index] = A[index] / B[index];
     }
 }
 
@@ -83,6 +111,7 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
         else if (op == Multiply) C[index] = A[index] * constValue;
         else if (op == SubstractInvert) C[index] = -(A[index] - constValue);
         else if (op == SquaredSubstractInvert) C[index] = -(pow(A[index], 2) - constValue);
+        else if (op == Exp) C[index] = std::exp(A[index]);
     }
 }
 
@@ -95,26 +124,100 @@ __global__ void addVecKernel(double* c, const double* a, const double* b)
 #pragma endregion
 
 #pragma region kernel calls
-void applyTanhToMatrix(CUDAMatrix* inputMatrix) {
+CUDAMatrix MatrixFromRowAverage(CUDAMatrix* mat) {
+
+    int rows = mat->GetRows();
+    int cols = mat->GetColumns();
+
+    double* resMat = new double[rows * cols];
+
+    // Allocate device memory
     double* d_matrix;
-    size_t size = inputMatrix->GetColumns() * inputMatrix->GetRows() * sizeof(double);
+    cudaMalloc(&d_matrix, rows * cols * sizeof(double));
+
+    // Copy the host matrix to the device
+    cudaMemcpy(d_matrix, mat->GetUnderlyingMatrix(), rows * cols * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Define block size and grid size
+    int blockSize = 256;
+    int gridSize = (rows + blockSize - 1) / blockSize;
+
+    // Launch the kernel to compute row averages and set each element to the average
+    setRowAverage << <gridSize, blockSize >> > (d_matrix, rows, cols);
+
+    // Copy the modified matrix from device to host
+    cudaMemcpy(resMat, d_matrix, rows * cols * sizeof(double), cudaMemcpyDeviceToHost);
+
+    CUDAMatrix resMatrix(rows, cols);
+    resMatrix.SetUnderlyingMatrix(resMat);
+
+    // Free device memory
+    cudaFree(d_matrix);
+
+    return resMatrix;
+}
+
+CUDAMatrix RowVectorFromRowAverage(CUDAMatrix* mat) {
+    //double h_rowAvg[M];
+
+    int rows = mat->GetRows();
+    int cols = mat->GetColumns();
+
+    double* h_rowAvg = new double[rows];
+
+    // Allocate device memory
+    double* d_matrix, * d_rowAvg;
+    cudaMalloc(&d_matrix, rows * cols * sizeof(double));
+    cudaMalloc(&d_rowAvg, rows * sizeof(double));
+
+    // Copy the host matrix to the device
+    cudaMemcpy(d_matrix, mat->GetUnderlyingMatrix(), rows * cols * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Define block size and grid size
+    int blockSize = 256;
+    int gridSize = (rows + blockSize - 1) / blockSize;
+
+    // Launch the kernel to compute row averages
+    rowAverage << <gridSize, blockSize >> > (d_matrix, d_rowAvg, rows, cols);
+
+    // Copy the row averages from device to host
+    cudaMemcpy(h_rowAvg, d_rowAvg, rows * sizeof(double), cudaMemcpyDeviceToHost);
+
+    CUDAMatrix resVector(rows, 1);
+    resVector.SetUnderlyingMatrix(h_rowAvg);
+
+    // Free device memory
+    cudaFree(d_matrix);
+    cudaFree(d_rowAvg);
+
+    return resVector;
+}
+
+CUDAMatrix applyTanhToMatrix(CUDAMatrix* inputMatrix) {
+
+    CUDAMatrix resMatrix = *inputMatrix;
+
+    double* d_matrix;
+    size_t size = resMatrix.GetColumns() * resMatrix.GetRows() * sizeof(double);
 
     // Allocate device memory
     CHECK_CUDA_ERROR(cudaMalloc(&d_matrix, size));
 
     // Copy data from host to device
-    CHECK_CUDA_ERROR(cudaMemcpy(d_matrix, inputMatrix->GetUnderlyingMatrix(), size, cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_matrix, resMatrix.GetUnderlyingMatrix(), size, cudaMemcpyHostToDevice));
 
     // Define block size and grid size
     dim3 blockSize(16, 16);
-    dim3 gridSize((inputMatrix->GetColumns() + blockSize.x - 1) / blockSize.x, (inputMatrix->GetRows() + blockSize.y - 1) / blockSize.y);
+    dim3 gridSize((resMatrix.GetColumns() + blockSize.x - 1) / blockSize.x, (resMatrix.GetRows() + blockSize.y - 1) / blockSize.y);
 
     // Launch the kernel
-    tanhKernel << <gridSize, blockSize >> > (d_matrix, inputMatrix->GetColumns(), inputMatrix->GetRows());
+    tanhKernel << <gridSize, blockSize >> > (d_matrix, resMatrix.GetColumns(), resMatrix.GetRows());
     CHECK_CUDA_ERROR(cudaGetLastError());
 
     // Copy the result back to host
-    CHECK_CUDA_ERROR(cudaMemcpy(inputMatrix->GetUnderlyingMatrix(), d_matrix, size, cudaMemcpyDeviceToHost));
+    CHECK_CUDA_ERROR(cudaMemcpy(resMatrix.GetUnderlyingMatrix(), d_matrix, size, cudaMemcpyDeviceToHost));
+
+    return resMatrix;
 
     // Free device memory
     CHECK_CUDA_ERROR(cudaFree(d_matrix));
@@ -126,7 +229,7 @@ CUDAMatrix transposeMatrix(CUDAMatrix inputMatrix) {
     //size_t size = width * height * sizeof(float);
     size_t size = inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double);
     //double* resUnderlying = (double*)malloc(size);
-    double* resUnderlying = new double[size];
+    double* resUnderlying = new double[inputMatrix.GetRows() * inputMatrix.GetColumns()];
 
     // Allocate device memory
     CHECK_CUDA_ERROR(cudaMalloc(&d_in, size));
@@ -236,11 +339,32 @@ void matrixElementWiseOperations(double* A, double constValue, double* C, int nu
     cudaFree(d_A);
     cudaFree(d_C);
 }
+
+CUDAMatrix applyExpToMatrix(CUDAMatrix* inputMatrix) {
+    MatrixOperation op = Exp;
+    double* matRes = new double[inputMatrix->GetRows() * inputMatrix->GetColumns()];
+    matrixElementWiseOperations(inputMatrix->GetUnderlyingMatrix(), -1, matRes, inputMatrix->GetRows(), inputMatrix->GetColumns(), op);
+    CUDAMatrix resMatrix(inputMatrix->GetRows(), inputMatrix->GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+}
 #pragma endregion
 
 #pragma region public calls
-void CUDAMatrix::tanh() {
-    applyTanhToMatrix(this);
+CUDAMatrix CUDAMatrix::tanh() {
+    return applyTanhToMatrix(this);
+}
+
+CUDAMatrix CUDAMatrix::exp() {
+    return applyExpToMatrix(this);
+}
+
+CUDAMatrix CUDAMatrix::RowAverageMatrix() {
+    return MatrixFromRowAverage(this);
+}
+
+CUDAMatrix CUDAMatrix::RowAverage() {
+    return RowVectorFromRowAverage(this);
 }
 
 CUDAMatrix MathHandler::TransposeMatrix(CUDAMatrix inputMatrix) {
@@ -309,20 +433,6 @@ CUDAMatrix CUDAMatrix::operator+(CUDAMatrix mat2) {
 }
 
 CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
-    //if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
-
-    //MatrixOperation op = Multiply;
-    ////double* matRes = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
-    //double* matRes = new double[this->GetRows() * mat2.GetColumns()];
-
-    //// TODO FIGURE OUT IF ELEMENT WISE OR NOT
-
-    //if (this->_arrayForm && mat2._arrayForm) matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
-    //else matrixMultiply(*this, mat2, matRes);
-    //CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
-    //resMatrix.SetUnderlyingMatrix(matRes);
-    //return resMatrix;
-
     if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) {
         throw std::invalid_argument("matrix multiplication dimensions incorrect!");
     }
@@ -344,10 +454,33 @@ CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
 
 }
 
+CUDAMatrix CUDAMatrix::operator/(const CUDAMatrix& mat2) const {
+    if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) {
+        throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+    }
+
+    MatrixOperation op = Divide;
+    double* matRes = new double[this->GetRows() * mat2.GetColumns()];
+
+    if (this->_arrayForm && mat2._arrayForm) {
+        matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
+    }
+    else {
+        // TODO even needed?
+        //matrixMultiply(*this, mat2, matRes);
+        //matrixMultiply(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), this->GetColumns(), mat2.GetRows(), mat2.GetColumns(), op);
+    }
+
+    CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+
+}
+
 CUDAMatrix CUDAMatrix::operator*(double constValue) {
     MatrixOperation op = Multiply;
     //double* matRes = (double*)malloc(this->GetRows() * this->GetColumns() * sizeof(double));
-    double* matRes = new double[this->GetRows() * this->GetColumns() * sizeof(double)];
+    double* matRes = new double[this->GetRows() * this->GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
@@ -356,7 +489,7 @@ CUDAMatrix CUDAMatrix::operator*(double constValue) {
 
 CUDAMatrix CUDAMatrix::operator/(double constValue) {
     MatrixOperation op = DivideExp;
-    double* matRes = new double[this->GetRows() * this->GetColumns() * sizeof(double)];
+    double* matRes = new double[this->GetRows() * this->GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
@@ -372,8 +505,8 @@ double MathHandler::GenerateRandomNumber(double lowerBound, double upperBound) {
 
 CUDAMatrix MathHandler::TanhDerivative(CUDAMatrix inputMatrix) {
     MatrixOperation op = SquaredSubstractInvert;
-    //double* matRes = (double*)malloc(inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double));
-    double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double)];
+    //double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double)];
+    double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns()];
     matrixElementWiseOperations(inputMatrix.GetUnderlyingMatrix(), 1, matRes, inputMatrix.GetRows(), inputMatrix.GetColumns(), op);
     CUDAMatrix resMatrix(inputMatrix.GetRows(), inputMatrix.GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
@@ -383,19 +516,37 @@ CUDAMatrix MathHandler::TanhDerivative(CUDAMatrix inputMatrix) {
 std::vector<CUDAMatrix> MathHandler::CreateOneHotEncodedVector(std::vector<int> cmdIDs, int allClasses) {
 
     std::vector<CUDAMatrix> oneHotEncodedClicks;
+    CUDAMatrix oneHotEncodedLabel = CUDAMatrix::Zero(allClasses, 1);
 
     for (int i = 0; i < cmdIDs.size(); i++)
     {
-        CUDAMatrix oneHotEncodedLabel(allClasses, 1);
-        //oneHotEncodedClicks.push_back(CUDAMatrix(allClasses, 1));
+        oneHotEncodedLabel(cmdIDs[i], 0) = 1.0;
+        oneHotEncodedClicks.push_back(oneHotEncodedLabel);
+        oneHotEncodedLabel(cmdIDs[i], 0) = 0;
+    }
 
-        for (int j = 0; j < allClasses; j++) {
-            oneHotEncodedLabel(j, 0) = cmdIDs[i] == j ? 1.0 : 0;
-            //oneHotEncodedClicks[oneHotEncodedClicks.size() - 1](j, 0) = cmdIDs[i] == j ? 1.0 : 0;
+    return oneHotEncodedClicks;
+}
+
+std::vector<CUDAMatrix> MathHandler::CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, int allClasses, int batchSize) {
+
+    std::vector<CUDAMatrix> oneHotEncodedClicks;
+
+    int seqLength = cmdIDs[0].size();
+
+    for (int i = 0; i < seqLength; i++)
+    {
+        CUDAMatrix oneHotEncodedLabel = CUDAMatrix::Zero(allClasses, batchSize);
+
+        for (int j = 0; j < batchSize; j++) {
+            oneHotEncodedLabel(cmdIDs[j][i], j) = 1.0;
         }
-
         oneHotEncodedClicks.push_back(oneHotEncodedLabel);
     }
+
+    /*for (int i = 0; i < 5; i++) {
+        oneHotEncodedClicks[i].Print();
+    }*/
 
     return oneHotEncodedClicks;
 }
