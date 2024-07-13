@@ -177,8 +177,8 @@ int main() {
 	std::vector<std::vector<int>> allSequencesFromFile;
 	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
 
-	readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\unixCommandData)", true);
-	//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\randomData)", true);
+	//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\unixCommandData)", true);
+	readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\randomData)", true);
 	allSequencesFromFile = std::get<0>(readFileRes);
 	std::map<std::string, int> commandIDsMap = std::get<1>(readFileRes);
 
@@ -189,17 +189,17 @@ int main() {
 
 	int allClasses = commandIDsMap.size();
 	//int allClasses = 5;
-	double learningRate = 0.01;
+	double learningRate = 0.001;
 	int inputNeurons = allClasses;
 	int outputNeurons = allClasses;
 	int hiddenNeurons = allClasses;
 
-	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 10);
+	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 16);
 
 	//CUDAMathTest(userSimulator);
 
 	int batchSize = userSimulator->GetBatchSize();
-	int epochs = 20;
+	int epochs = 2;
 	int currentEpoch = 0;
 
 	while (currentEpoch <= epochs) {
@@ -455,6 +455,7 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 
 void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode) {
 	//_inputWeights.Print();
+	//printf("onehotEncodedInput\n");
 	//onehotEncodedInput.Print();
 	CUDAMatrix XI = _inputWeights * onehotEncodedInput;
 	//XI.Print();
@@ -476,7 +477,6 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 	//printf("activatedHiddenLayer\n");
 	//activatedHiddenLayer.Print();
 	_hiddenStepValues.push_back(activatedHiddenLayer);
-	//activatedHiddenLayer.Print();
 
 
 	// compute output
@@ -555,11 +555,14 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	// Initialize gradients
 	CUDAMatrix outputWeightsGrad = CUDAMatrix::Zero(_weightsOutput.GetRows(), _weightsOutput.GetColumns());
 	CUDAMatrix outputBiasGrad = CUDAMatrix::Zero(_outputNeurons, this->_batchSize);
+	//CUDAMatrix outputBiasGrad = CUDAMatrix::Zero(_outputNeurons, 1);
 	CUDAMatrix hiddenWeightsGrad = CUDAMatrix::Zero(_hiddenWeights.GetRows(), _hiddenWeights.GetColumns());
 	CUDAMatrix hiddenBiasGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, this->_batchSize);
+	//CUDAMatrix hiddenBiasGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, 1);
 	CUDAMatrix inputWeightsGrad = CUDAMatrix::Zero(_inputWeights.GetRows(), _inputWeights.GetColumns());
 
 	CUDAMatrix nextHiddenGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, this->_batchSize);
+	//CUDAMatrix nextHiddenGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, 1);
 
 	// Iterate over each timestep from last to first
 	for (int i = _outputValues.size() - 1; i >= 0; i--) {
@@ -596,49 +599,19 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	outputBiasGrad.Print();*/
 
 	// Apply learning rate adjustment
-	//double adjustedLearningRate = learningRate * (_batchSize / _allTrainingExamplesCount);
-	//double adjustedLearningRate = learningRate / (_batchSize * _outputValues.size());
-	//double adjustedLearningRate = learningRate / _outputValues.size() * std::sqrt(_batchSize);
 	double adjustedLearningRate = learningRate * std::sqrt(_batchSize);
 	//double adjustedLearningRate = learningRate / _outputValues.size();
 
-	/*printf("--------------------------------------------ALL GRADIENTS--------------------------------------------\n");
-
-	inputWeightsGrad.RowAverageMatrix().Print();
-	hiddenWeightsGrad.RowAverageMatrix().Print();
-	hiddenBiasGrad.RowAverage().Print();
-	outputWeightsGrad.RowAverageMatrix().Print();
-	outputBiasGrad.Print();
-	outputBiasGrad.RowAverage().Print();*/
-
-	/*inputWeightsGrad = inputWeightsGrad * (1 / _batchSize);
-	hiddenWeightsGrad = hiddenWeightsGrad * (1 / _batchSize);
-	hiddenBiasGrad = hiddenBiasGrad * (1 / _batchSize);
-	outputWeightsGrad = outputWeightsGrad * (1 / _batchSize);
-	outputBiasGrad = outputBiasGrad * (1 / _batchSize);*/
-
-	//// Update weights and biases
-	//printf("inputWeightsGrad\n");
 	//inputWeightsGrad.Print();
-	//printf("inputWeightsGrad AVERAGED ROW\n");
-	//inputWeightsGrad.RowAverageMatrix().Print();
-	//(inputWeightsGrad.RowAverageMatrix() * adjustedLearningRate).Print();
 
-
-	_inputWeights -= inputWeightsGrad.RowAverageMatrix() * adjustedLearningRate;
-	_hiddenWeights -= hiddenWeightsGrad.RowAverageMatrix() * adjustedLearningRate;
+	_inputWeights -= inputWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
+	_hiddenWeights -= hiddenWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
 	_biasesHidden -= hiddenBiasGrad.RowAverage() * adjustedLearningRate;
-	_weightsOutput -= outputWeightsGrad.RowAverageMatrix() * adjustedLearningRate;
+	_weightsOutput -= outputWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
 	_biasesOutput -= outputBiasGrad.RowAverage() * adjustedLearningRate;
 
 	_batchBiasesHidden -= hiddenBiasGrad.RowAverageMatrix() * adjustedLearningRate;
 	_batchBiasesOutput -= outputBiasGrad.RowAverageMatrix() * adjustedLearningRate;
-
-	/*_inputWeights -= inputWeightsGrad * adjustedLearningRate;
-	_hiddenWeights -= hiddenWeightsGrad * adjustedLearningRate;
-	_biasesHidden -= hiddenBiasGrad * adjustedLearningRate;
-	_weightsOutput -= outputWeightsGrad * adjustedLearningRate;
-	_biasesOutput -= outputBiasGrad * adjustedLearningRate;*/
 }
 
 int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode) {
@@ -659,6 +632,16 @@ int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEn
 
 	//printf("----------------------------finished forward prop-----------------------------------------\n");
 	//PrintAllParameters();
+
+	/*printf("hidden values and output values after forward prop\n");
+	printf("hidden\n");
+	for (int i = 0; i < _hiddenStepValues.size(); i++) {
+		_hiddenStepValues[i].Print();
+	}
+	printf("output\n");
+	for (int i = 0; i < _outputValues.size(); i++) {
+		_outputValues[i].Print();
+	}*/
 
 	int firstClickID = -1;
 	int classID = -1;

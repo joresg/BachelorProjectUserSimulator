@@ -20,7 +20,6 @@ public:
 	CUDAMatrix exp();
 	CUDAMatrix RowAverage();
 	CUDAMatrix RowAverageMatrix();
-	CUDAMatrix ClipByNorm(double maxNorm);
 
 	int GetRows() const { return _rows; }
 	int GetColumns() const { return _cols; }
@@ -36,19 +35,6 @@ public:
 	CUDAMatrix Array();
 	void Destroy();
 	void Print();
-
-	// Calculate Frobenius norm
-	double Norm() const {
-		double sum = 0.0;
-		for (int i = 0; i < _rows; ++i) {
-			for (int j = 0; j < _cols; ++j) {
-				//sum += (*this)(i, j) * (*this)(i, j);
-				sum += (i, j) * (i, j);
-			}
-		}
-		//return std::sqrt(sum);
-		return 1;
-	}
 
 #pragma region operator overloads
 	double& operator()(int row, int col);

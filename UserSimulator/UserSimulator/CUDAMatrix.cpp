@@ -37,7 +37,6 @@ CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
 	this->_arrayForm = false;
 	this->_cols = inputMatrix.GetColumns();
 	this->_rows = inputMatrix.GetRows();
-	//if (!_underlyingMatrix) _underlyingMatrix = (double*)malloc(_rows * _cols * sizeof(double));
 
 	delete[] this->_underlyingMatrix;
 	_underlyingMatrix = new double[_rows * _cols];
@@ -47,18 +46,6 @@ CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
 	return *this;
 
 }
-
-//CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
-//	std::swap(_rows, inputMatrix._rows);
-//	std::swap(_cols, inputMatrix._cols);
-//	std::swap(_underlyingMatrix, inputMatrix._underlyingMatrix);
-//	// ???????????????????????????
-//	delete[] _underlyingMatrix;
-//	_underlyingMatrix = nullptr;
-//
-//	std::swap(_arrayForm, inputMatrix._arrayForm);
-//	return *this;
-//}
 
 void CUDAMatrix::Resize(int rows, int columns) {
 	delete[] _underlyingMatrix; // Free the old memory
@@ -81,10 +68,6 @@ void CUDAMatrix::Print() {
 }
 
 CUDAMatrix CUDAMatrix::Zero(int rows, int columns) {
-	/*CUDAMatrix newMatrix(rows, columns);
-	memset(newMatrix._underlyingMatrix, 0, newMatrix._rows * newMatrix._cols * sizeof(double));
-	return newMatrix;*/
-
 	CUDAMatrix newMatrix(rows, columns);
 	std::fill(newMatrix._underlyingMatrix, newMatrix._underlyingMatrix + rows * columns, 0.0);
 	return newMatrix;
@@ -94,14 +77,6 @@ CUDAMatrix CUDAMatrix::Array() {
 	CUDAMatrix res = *this;
 	res._arrayForm = true;
 	return res;
-}
-
-CUDAMatrix CUDAMatrix::ClipByNorm(double maxNorm) {
-	double norm = this->Norm(); // Assuming Norm() calculates the Frobenius norm
-	if (norm > maxNorm) {
-		return (*this) * (maxNorm / norm);
-	}
-	return *this;
 }
 
 void CUDAMatrix::Destroy() {

@@ -46,14 +46,11 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 
 	std::ifstream infile(filePath);
 	std::string line;
-	//int seqLength = 20;
-	//int seqOverlap = 19;
-	int seqLength = 20;
+	int seqLength = 5;
 	int seqOverlap = seqLength - 1;
-	//int seqOverlap = 15;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = 500;
+	int limitLines = -1;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 

@@ -1,5 +1,29 @@
-﻿  UserSimulator.cpp
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(190,17): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(238,29): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(565,13): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+﻿  Compiling CUDA source file MathHandler.cu...
+  
+  C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\MSVC\14.40.33807\bin\HostX64\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\include"  -G   --keep-dir x64\Debug  -maxrregcount=0   --machine 64 --compile -cudart static  -g  -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -Xcompiler "/Fdx64\Debug\vc143.pdb" -o C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\x64\Debug\MathHandler.cu.obj "C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\MathHandler.cu" 
+C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\MathHandler.cu(223): warning #128-D: loop is not reachable
+        do { cudaError_t err = cudaFree(d_matrix); if (err != cudaSuccess) { std::cerr << "CUDA Error: " << cudaGetErrorString(err) << " at " << "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cu" << ":" << 223 << std::endl; exit(err); } } while(0);
+        ^
+  
+  Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+  
+C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\MathHandler.cu(224): warning #940-D: missing return statement at end of non-void function "applyTanhToMatrix"
+    }
+    ^
+  
+C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\MathHandler.cu(223): warning #128-D: loop is not reachable
+        do { cudaError_t err = cudaFree(d_matrix); if (err != cudaSuccess) { std::cerr << "CUDA Error: " << cudaGetErrorString(err) << " at " << "C:\\Users\\joresg\\git\\BachelorProjectCUDA\\UserSimulator\\UserSimulator\\MathHandler.cu" << ":" << 223 << std::endl; exit(err); } } while(0);
+        ^
+  
+  Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+  
+C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\MathHandler.cu(224): warning #940-D: missing return statement at end of non-void function "applyTanhToMatrix"
+    }
+    ^
+  
+  MathHandler.cu
+  tmpxft_00002d80_00000000-7_MathHandler.cudafe1.cpp
+C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\MathHandler.cu(523): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+     Creating library C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.lib and object C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.exp
+LINK : warning LNK4098: defaultlib 'LIBCMT' conflicts with use of other libs; use /NODEFAULTLIB:library
   UserSimulator.vcxproj -> C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.exe

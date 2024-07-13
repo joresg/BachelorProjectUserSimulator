@@ -8,6 +8,8 @@
 #include <random>
 #include <math.h>
 #include <stdexcept>
+#include <queue>
+#include <chrono>
 
 //#include <cuda_runtime.h>
 //#include <algorithm>

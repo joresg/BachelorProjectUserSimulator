@@ -374,17 +374,6 @@ CUDAMatrix MathHandler::TransposeMatrix(CUDAMatrix inputMatrix) {
 
 #pragma region operator overloads
 CUDAMatrix& CUDAMatrix::operator+=(const CUDAMatrix& mat2) {
-    //if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
-    //this->_arrayForm = false;
-    //MatrixOperation op = Add;
-    ////double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
-    //double* res = new double[this->GetRows() * mat2.GetColumns()];
-    //matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
-    //delete[] this->_underlyingMatrix;
-    ////CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
-    //this->SetUnderlyingMatrix(res);
-    //return *this;
-
     if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) {
         throw std::invalid_argument("matrix addition dimensions incorrect!");
     }
@@ -400,10 +389,8 @@ CUDAMatrix CUDAMatrix::operator-=(CUDAMatrix mat2) {
     if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
     this->_arrayForm = false;
     MatrixOperation op = Substract;
-    //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
     double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
-    //this->_underlyingMatrix = nullptr;
     this->SetUnderlyingMatrix(res);
     return *this;
 }
@@ -412,7 +399,6 @@ CUDAMatrix CUDAMatrix::operator-(CUDAMatrix mat2) {
     if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
 
     MatrixOperation op = Substract;
-    //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
     double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
@@ -424,7 +410,6 @@ CUDAMatrix CUDAMatrix::operator+(CUDAMatrix mat2) {
     if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
 
     MatrixOperation op = Add;
-    //double* res = (double*)malloc(this->GetRows() * mat2.GetColumns() * sizeof(double));
     double* res = new double[this->GetRows() * mat2.GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
@@ -467,8 +452,6 @@ CUDAMatrix CUDAMatrix::operator/(const CUDAMatrix& mat2) const {
     }
     else {
         // TODO even needed?
-        //matrixMultiply(*this, mat2, matRes);
-        //matrixMultiply(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), this->GetColumns(), mat2.GetRows(), mat2.GetColumns(), op);
     }
 
     CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
@@ -479,7 +462,6 @@ CUDAMatrix CUDAMatrix::operator/(const CUDAMatrix& mat2) const {
 
 CUDAMatrix CUDAMatrix::operator*(double constValue) {
     MatrixOperation op = Multiply;
-    //double* matRes = (double*)malloc(this->GetRows() * this->GetColumns() * sizeof(double));
     double* matRes = new double[this->GetRows() * this->GetColumns()];
     matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
     CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
@@ -505,7 +487,6 @@ double MathHandler::GenerateRandomNumber(double lowerBound, double upperBound) {
 
 CUDAMatrix MathHandler::TanhDerivative(CUDAMatrix inputMatrix) {
     MatrixOperation op = SquaredSubstractInvert;
-    //double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns() * sizeof(double)];
     double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns()];
     matrixElementWiseOperations(inputMatrix.GetUnderlyingMatrix(), 1, matRes, inputMatrix.GetRows(), inputMatrix.GetColumns(), op);
     CUDAMatrix resMatrix(inputMatrix.GetRows(), inputMatrix.GetColumns());
@@ -531,6 +512,10 @@ std::vector<CUDAMatrix> MathHandler::CreateOneHotEncodedVector(std::vector<int> 
 std::vector<CUDAMatrix> MathHandler::CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, int allClasses, int batchSize) {
 
     std::vector<CUDAMatrix> oneHotEncodedClicks;
+
+    std::queue<int> randomOrder;
+
+    std::shuffle(cmdIDs.begin(), cmdIDs.end(), _re);
 
     int seqLength = cmdIDs[0].size();
 
