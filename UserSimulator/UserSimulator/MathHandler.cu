@@ -217,10 +217,10 @@ CUDAMatrix applyTanhToMatrix(CUDAMatrix* inputMatrix) {
     // Copy the result back to host
     CHECK_CUDA_ERROR(cudaMemcpy(resMatrix.GetUnderlyingMatrix(), d_matrix, size, cudaMemcpyDeviceToHost));
 
-    return resMatrix;
-
     // Free device memory
     CHECK_CUDA_ERROR(cudaFree(d_matrix));
+
+    return resMatrix;
 }
 
 //void transposeMatrix(const float* h_in, float* h_out, int width, int height) {

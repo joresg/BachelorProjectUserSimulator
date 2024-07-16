@@ -7,6 +7,7 @@ class UserSimulator
 {
 public:
 	UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize);
+	double EvaluateOnValidateSet();
 	int PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
 	void BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
@@ -15,6 +16,8 @@ public:
 	int GetBatchSize() { return _batchSize; }
 	CUDAMatrix GetBiasesOutput() { return _biasesOutput; }
 	void SetAllTrainingExamplesCount(int allTrainingExamples) { _allTrainingExamplesCount = allTrainingExamples; }
+	std::vector<std::vector<int>> GetValidationSet() { return _validationSet; }
+	void SetValidationSet(std::vector<std::vector<int>> validationSet) { _validationSet = validationSet; }
 	void PrintAllParameters() {
 		printf("_inputWeights\n");
 		_inputWeights.Print();
@@ -30,14 +33,6 @@ public:
 		_biasesOutput.Print();
 		printf("_batchBiasesOutput\n");
 		_batchBiasesOutput.Print();
-		/*printf("_hiddenStepValues\n");
-		for (int i = 0; i < _hiddenStepValues.size(); i++) {
-			_hiddenStepValues[i].Print();
-		}
-		printf("_outputValues\n");
-		for (int i = 0; i < _outputValues.size(); i++) {
-			_outputValues[i].Print();
-		}*/
 	}
 
 private:
@@ -65,4 +60,7 @@ private:
 	double _learningRate;
 	int _batchSize;
 	int _allTrainingExamplesCount;
+	int _allClasses;
+
+	std::vector<std::vector<int>> _validationSet;
 };

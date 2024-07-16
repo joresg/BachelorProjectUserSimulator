@@ -41,16 +41,16 @@
 //	return res;
 //}
 
-std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManager::ReadTXTFile(const char* filePath, bool isTrainData) {
+std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManager::ReadTXTFile(const char* filePath, bool isTrainData, int trainingSeqLength) {
 	std::vector<std::vector<int>> allSequences;
 
 	std::ifstream infile(filePath);
 	std::string line;
-	int seqLength = 5;
+	int seqLength = trainingSeqLength;
 	int seqOverlap = seqLength - 1;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = -1;
+	int limitLines = 1000;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 

@@ -171,35 +171,51 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	bool verboseMode = false;
 
+	int trainingSeqLength = 5;
+
 	cudaDeviceReset();
 
 	FileManager* fileManager = new FileManager();
 	std::vector<std::vector<int>> allSequencesFromFile;
 	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
 
-	//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\unixCommandData)", true);
-	readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\randomData)", true);
+	readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\unixCommandData)", true, trainingSeqLength);
+	//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProject\RNN\inputData\randomData)", true);
 	allSequencesFromFile = std::get<0>(readFileRes);
 	std::map<std::string, int> commandIDsMap = std::get<1>(readFileRes);
 
-	/*for (auto it = commandIDsMap.cbegin(); it != commandIDsMap.cend(); ++it)
-	{
-		std::cout << it->first << " - " << it->second << "\n";
-	}*/
+	// split into training and validation set
+
+	int trainingSetSize = allSequencesFromFile.size() * 0.8;
+	int validationSetSize = allSequencesFromFile.size() - trainingSetSize;
+
+	std::vector<std::vector<int>> trainingSet;
+	std::vector<std::vector<int>> validationSet;
 
 	int allClasses = commandIDsMap.size();
 	//int allClasses = 5;
-	double learningRate = 0.001;
+	double learningRate = 0.00001;
 	int inputNeurons = allClasses;
 	int outputNeurons = allClasses;
 	int hiddenNeurons = allClasses;
 
-	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 16);
+	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 32);
+
+	for (int i = 0; i < trainingSetSize; i++) {
+		trainingSet.push_back(allSequencesFromFile[i]);
+	}
+
+	for (int i = trainingSetSize; i < allSequencesFromFile.size(); i++) {
+		validationSet.push_back(allSequencesFromFile[i]);
+		//userSimulator->GetValidationSet().push_back(allSequencesFromFile[i]);
+	}
+
+	userSimulator->SetValidationSet(validationSet);
 
 	//CUDAMathTest(userSimulator);
 
 	int batchSize = userSimulator->GetBatchSize();
-	int epochs = 2;
+	int epochs = 20;
 	int currentEpoch = 0;
 
 	while (currentEpoch <= epochs) {
@@ -235,7 +251,7 @@ int main() {
 
 		// BATCH IMPLEMENTATION
 
-		int trainingExamplesCount = allSequencesFromFile.size();
+		int trainingExamplesCount = trainingSet.size();
 		userSimulator->SetAllTrainingExamplesCount(trainingExamplesCount);
 
 		for (int k = 0; k < trainingExamplesCount; k += batchSize) {
@@ -243,8 +259,8 @@ int main() {
 				// todo adjust final batch size if smaller
 				break;
 			}
-			std::vector<std::vector<int>>::const_iterator first = allSequencesFromFile.begin() + k;
-			std::vector<std::vector<int>>::const_iterator last = allSequencesFromFile.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount - 1);
+			std::vector<std::vector<int>>::const_iterator first = trainingSet.begin() + k;
+			std::vector<std::vector<int>>::const_iterator last = trainingSet.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount - 1);
 			//std::vector<std::vector<int>>::const_iterator last = allSequencesFromFile.begin() + (k + batchSize < allSequencesFromFile.size() ? k + batchSize: 1) + batchSize;
 			std::vector<std::vector<int>> newVec(first, last);
 			std::vector<CUDAMatrix> oneHotEncodedInput = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, allClasses, batchSize);
@@ -258,6 +274,13 @@ int main() {
 		}
 
 		currentEpoch++;
+
+		// run validation for early stoppping
+
+		if (userSimulator->EvaluateOnValidateSet() >= 0.8) {
+			printf("0.8 accuarcy reached...\n");
+			break;
+		}
 	}
 
 	printf("FINISHED TRAINING\n");
@@ -327,6 +350,8 @@ int main() {
 			//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i % 5 == 0 ? 2 : predictedClassID));
 			generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, predictedClassID));
 
+			if (generatedSequence.size() > trainingSeqLength + trainingSeqLength / 2) generatedSequence.erase(generatedSequence.begin());
+
 			// randomness experiment
 			//generatedSequenceClassIDs.push_back(i % 5 == 0 ? 2 : predictedClassID);
 			generatedSequenceClassIDs.push_back(predictedClassID);
@@ -376,7 +401,8 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 	_inputNeurons = inputNeurons;
 	_hiddenLayerNeurons = hiddenLayerNeurons;
 	_outputNeurons = outputNeurons;
-	_totalLoss = 0;
+	_allClasses = outputNeurons;
+	_totalLoss = 0; 
 
 	unsigned long int randSeed = 18273;
 	_mathHandler = new MathHandler(randSeed);
@@ -451,6 +477,31 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 	_biasesHidden.Print();
 
 	//_biasesOutput.Print();
+}
+
+double UserSimulator::EvaluateOnValidateSet() {
+
+	// go through all examples in validation set, break them down and test next click
+	int allTests = 0;
+	int correctPredictions = 0;
+	std::vector<CUDAMatrix> clickSequence;
+	for (int i = 0; i < _validationSet.size(); i++) {
+		std::vector<CUDAMatrix> oneHotEncodedValidationClickSequenceExample = _mathHandler->CreateOneHotEncodedVector(_validationSet[i], _allClasses);
+		for (int j = 0; j < _validationSet[i].size() - 1; j++) {
+			clickSequence.clear();
+			std::vector<CUDAMatrix>::const_iterator first = oneHotEncodedValidationClickSequenceExample.begin();
+			std::vector<CUDAMatrix>::const_iterator last = oneHotEncodedValidationClickSequenceExample.begin() + j + 1;
+			std::vector<CUDAMatrix> slicedClicks(first, last);
+
+			int predictedClick = PredictNextClickFromSequence(slicedClicks, false, false, false);
+			allTests++;
+			if (predictedClick == _validationSet[i][j + 1]) correctPredictions++;
+		}
+	}
+
+	double validationSucess = correctPredictions / (double)allTests;
+	printf("testing on validation set.... accuracy: %d%%\n", (int)(validationSucess * 100));
+	return validationSucess;
 }
 
 void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode) {
