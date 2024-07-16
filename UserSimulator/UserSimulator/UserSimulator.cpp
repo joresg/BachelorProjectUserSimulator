@@ -345,7 +345,7 @@ int main() {
 
 		for (int i = 0; i < sequenceLength - splitInputIntegers.size(); i++) {
 			//clickPredictor->ForwardProp()
-			int predictedClassID = userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false);
+			int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false).back());
 
 			// randomness experiment
 			//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i % 5 == 0 ? 2 : predictedClassID));
@@ -481,9 +481,6 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 }
 
 double UserSimulator::EvaluateOnValidateSet() {
-
-	// TODO don't just pick top class but consider others with high probability as well
-
 	// go through all examples in validation set, break them down and test next click
 	int allTests = 0;
 	int correctPredictions = 0;
@@ -496,9 +493,11 @@ double UserSimulator::EvaluateOnValidateSet() {
 			std::vector<CUDAMatrix>::const_iterator last = oneHotEncodedValidationClickSequenceExample.begin() + j + 1;
 			std::vector<CUDAMatrix> slicedClicks(first, last);
 
-			int predictedClick = PredictNextClickFromSequence(slicedClicks, false, false, false);
+			std::deque<std::tuple<int, double>> predictedClicks = PredictNextClickFromSequence(slicedClicks, false, false, false, 4);
 			allTests++;
-			if (predictedClick == _validationSet[i][j + 1]) correctPredictions++;
+			for (std::tuple<int, double> const &classIDAndProb : predictedClicks) {
+				if (std::get<0>(classIDAndProb) == _validationSet[i][j + 1]) correctPredictions++;
+			}
 		}
 	}
 
@@ -668,7 +667,7 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	_batchBiasesOutput -= outputBiasGrad.RowAverageMatrix() * adjustedLearningRate;
 }
 
-int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode) {
+std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses) {
 
 	_hiddenStepValues.clear();
 	_outputValues.clear();
@@ -700,6 +699,11 @@ int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEn
 	int firstClickID = -1;
 	int classID = -1;
 
+	//std::queue<int> topNIDs;
+	// class id --------- probability
+	//std::queue<std::tuple<int, int>> topNIDs;
+	std::deque<std::tuple<int, double>> topNIDs;
+
 	if (!trainMode)
 	{
 		for (int j = 0; j < onehotEncodedLabels[0].GetRows(); j++) {
@@ -708,18 +712,66 @@ int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEn
 				break;
 			}
 		}
-		if (performBackProp && verboseMode) std::cout << "STARTED WITH: " << firstClickID << std::endl;
-		// test print predicted sequence
-		for (int i = 0; i < _outputValues.size(); i++) {
-			double maxProbability = 0;//_outputValues[i].maxCoeff();
-			for (int j = 0; j < _outputValues[i].GetRows(); j++) {
-				if (_outputValues[i](j, 0) > maxProbability) {
-					maxProbability = _outputValues[i](j, 0);
-					classID = j;
+		//if (performBackProp && verboseMode) std::cout << "STARTED WITH: " << firstClickID << std::endl;
+
+		if (selectNTopClasses == 1)
+		{
+			double maxProbability = 0;
+			for (int i = 0; i < _outputValues.size(); i++) {
+				maxProbability = 0;//_outputValues[i].maxCoeff();
+				for (int j = 0; j < _outputValues[i].GetRows(); j++) {
+					if (_outputValues[i](j, 0) > maxProbability) {
+						maxProbability = _outputValues[i](j, 0);
+						classID = j;
+					}
+				}
+				//std::cout << outputValues[i].maxCoeff() << std::endl;
+				if (performBackProp && verboseMode) std::cout << classID << std::endl;
+			}
+
+			topNIDs.push_front(std::make_tuple(classID, maxProbability));
+		}
+		else {
+			CUDAMatrix lastTimeStep = _outputValues[_outputValues.size() - 1];
+			for (int i = 0; i < selectNTopClasses; i++) {
+				topNIDs.push_front(std::make_tuple(i, lastTimeStep(i, 0)));
+			}
+			std::sort(topNIDs.begin(), topNIDs.end());
+			//topNIDs.push(std::make_tuple(0, lastTimeStep(0, 0)));
+			for (int i = selectNTopClasses; i < lastTimeStep.GetRows(); i++) {
+
+				// figure out at which position to insert if probability is high enough
+
+				//if (lastTimeStep(i, 0) > std::get<1>(topNIDs.front())) {
+				//	//maxProbability = _outputValues[i](j, 0);
+				//	//classID = j;
+				//	//std::sort(topNIDs.front(), topNIDs.back());
+
+				//	int tuplePos = 0;
+
+				//	for (std::tuple<int, int>& tuple : topNIDs) {
+				//		if(lastTimeStep(i, 0) > std::get<1>(tuple))
+				//	}
+
+				//	std::sort(topNIDs.begin(), topNIDs.end());
+				//}
+
+				if (lastTimeStep(i, 0) > std::get<1>(topNIDs.front()))
+				{
+					std::tuple<int, double>& tupleToChange = topNIDs.front();
+					classID = -1;
+					double classProbability = 0;
+
+					for (std::tuple<int, double>& tuple : topNIDs) {
+						if (lastTimeStep(i, 0) > std::get<1>(tuple)) tupleToChange = tuple;
+						classID = i;
+						classProbability = lastTimeStep(i, 0);
+					}
+
+					std::get<0>(tupleToChange) = classID;
+					std::get<1>(tupleToChange) = classProbability;
 				}
 			}
-			//std::cout << outputValues[i].maxCoeff() << std::endl;
-			if (performBackProp && verboseMode) std::cout << classID << std::endl;
 		}
 	}
 
@@ -730,7 +782,7 @@ int UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEn
 	//BackProp(onehotEncodedLabels[onehotEncodedLabels.size() - 1], _learningRate);
 	if (performBackProp) BackProp(onehotEncodedLabels, _learningRate, verboseMode);
 
-	return classID;
+	return topNIDs;
 }
 
 void UserSimulator::PrintPredictedClassProbabilities() {
