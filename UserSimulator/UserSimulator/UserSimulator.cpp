@@ -278,6 +278,7 @@ int main() {
 		// run validation for early stoppping
 
 		if (userSimulator->EvaluateOnValidateSet() >= 0.8) {
+			// TODO save model parameters and revert back to previous after degradation
 			printf("0.8 accuarcy reached...\n");
 			break;
 		}
@@ -480,6 +481,8 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 }
 
 double UserSimulator::EvaluateOnValidateSet() {
+
+	// TODO don't just pick top class but consider others with high probability as well
 
 	// go through all examples in validation set, break them down and test next click
 	int allTests = 0;
