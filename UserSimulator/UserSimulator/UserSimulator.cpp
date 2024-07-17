@@ -201,6 +201,8 @@ int main() {
 
 	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 32);
 
+	std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
+
 	for (int i = 0; i < trainingSetSize; i++) {
 		trainingSet.push_back(allSequencesFromFile[i]);
 	}
@@ -217,6 +219,8 @@ int main() {
 	int batchSize = userSimulator->GetBatchSize();
 	int epochs = 20;
 	int currentEpoch = 0;
+	double maxAccAchieved = 0;
+	double desiredAcc = 0.8;
 
 	while (currentEpoch <= epochs) {
 
@@ -277,11 +281,20 @@ int main() {
 
 		// run validation for early stoppping
 
-		if (userSimulator->EvaluateOnValidateSet() >= 0.8) {
-			// TODO save model parameters and revert back to previous after degradation
-			printf("0.8 accuarcy reached...\n");
+		double currentAcc = userSimulator->EvaluateOnValidateSet();
+		if (currentAcc > maxAccAchieved) maxAccAchieved = currentAcc;
+		if (currentAcc < maxAccAchieved - 0.05) {
+			printf("model deteriorated too much stopping training\n");
+			// todo have previous version saved and restore parameters to that version
 			break;
 		}
+
+		if (currentAcc >= desiredAcc) {
+			// TODO save model parameters and revert back to previous after degradation
+			printf("%f accuarcy reached...\n", desiredAcc);
+			break;
+		}
+
 	}
 
 	printf("FINISHED TRAINING\n");
@@ -345,7 +358,8 @@ int main() {
 
 		for (int i = 0; i < sequenceLength - splitInputIntegers.size(); i++) {
 			//clickPredictor->ForwardProp()
-			int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false).back());
+			//int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false).back());
+			int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false, 5).back());
 
 			// randomness experiment
 			//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i % 5 == 0 ? 2 : predictedClassID));
@@ -702,6 +716,8 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 	//std::queue<int> topNIDs;
 	// class id --------- probability
 	//std::queue<std::tuple<int, int>> topNIDs;
+	//only add them if probability is high enough, eg. >= 100%/selectNTopClasses
+	double minTopNProbabilitiesThreshold = selectNTopClasses > 1 ? 1 / (double)selectNTopClasses : 0;
 	std::deque<std::tuple<int, double>> topNIDs;
 
 	if (!trainMode)
@@ -736,7 +752,9 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 			for (int i = 0; i < selectNTopClasses; i++) {
 				topNIDs.push_front(std::make_tuple(i, lastTimeStep(i, 0)));
 			}
-			std::sort(topNIDs.begin(), topNIDs.end());
+			std::sort(topNIDs.begin(), topNIDs.end(), [](const auto& a, const auto& b) {
+				return std::get<1>(a) < std::get<1>(b);
+			});
 			//topNIDs.push(std::make_tuple(0, lastTimeStep(0, 0)));
 			for (int i = selectNTopClasses; i < lastTimeStep.GetRows(); i++) {
 
@@ -781,6 +799,15 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 	//BackProp(onehotEncodedLabels[onehotEncodedLabels.size() - 1], _learningRate);
 	if (performBackProp) BackProp(onehotEncodedLabels, _learningRate, verboseMode);
+
+	std::sort(topNIDs.begin(), topNIDs.end(), [](const auto& a, const auto& b) {
+		return std::get<1>(a) < std::get<1>(b);
+	});
+	
+	while (!topNIDs.empty()) {
+		if (std::get<1>(topNIDs.front()) > minTopNProbabilitiesThreshold) break;
+		topNIDs.pop_front();
+	}
 
 	return topNIDs;
 }
