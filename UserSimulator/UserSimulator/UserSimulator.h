@@ -35,6 +35,9 @@ public:
 		_batchBiasesOutput.Print();
 	}
 
+	void CopyParameters();
+	void RestoreBestParameters();
+
 private:
 	MathHandler* _mathHandler;
 
@@ -45,6 +48,12 @@ private:
 	CUDAMatrix _batchBiasesHidden;
 	CUDAMatrix _biasesOutput;
 	CUDAMatrix _batchBiasesOutput;
+
+	CUDAMatrix _inputWeightsCopy;
+	CUDAMatrix _hiddenWeightsCopy;
+	CUDAMatrix _weightsOutputCopy;
+	CUDAMatrix _biasesHiddenCopy;
+	CUDAMatrix _biasesOutputCopy;
 
 	std::vector<CUDAMatrix> _hiddenStepValues;
 	std::vector<CUDAMatrix> _outputValues;

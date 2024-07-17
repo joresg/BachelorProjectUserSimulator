@@ -171,7 +171,7 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	bool verboseMode = false;
 
-	int trainingSeqLength = 5;
+	int trainingSeqLength = 10;
 
 	cudaDeviceReset();
 
@@ -194,12 +194,12 @@ int main() {
 
 	int allClasses = commandIDsMap.size();
 	//int allClasses = 5;
-	double learningRate = 0.00001;
+	double learningRate = 0.0001;
 	int inputNeurons = allClasses;
 	int outputNeurons = allClasses;
 	int hiddenNeurons = allClasses;
 
-	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 32);
+	UserSimulator* userSimulator = new UserSimulator(inputNeurons, hiddenNeurons, outputNeurons, learningRate, 16);
 
 	std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
 
@@ -220,9 +220,9 @@ int main() {
 	int epochs = 20;
 	int currentEpoch = 0;
 	double maxAccAchieved = 0;
-	double desiredAcc = 0.8;
+	double desiredAcc = 0.75;
 
-	while (currentEpoch <= epochs) {
+	while (true) {
 
 		/*if (currentEpoch == epochs) {
 			printf("continue training with how many epochs?\n");
@@ -281,18 +281,22 @@ int main() {
 
 		// run validation for early stoppping
 
-		double currentAcc = userSimulator->EvaluateOnValidateSet();
-		if (currentAcc > maxAccAchieved) maxAccAchieved = currentAcc;
-		if (currentAcc < maxAccAchieved - 0.05) {
-			printf("model deteriorated too much stopping training\n");
-			// todo have previous version saved and restore parameters to that version
-			break;
-		}
-
-		if (currentAcc >= desiredAcc) {
-			// TODO save model parameters and revert back to previous after degradation
-			printf("%f accuarcy reached...\n", desiredAcc);
-			break;
+		if (currentEpoch > 40)
+		{
+			double currentAcc = userSimulator->EvaluateOnValidateSet();
+			if (currentAcc > maxAccAchieved) {
+				maxAccAchieved = currentAcc;
+				userSimulator->CopyParameters();
+			}
+			if (currentAcc < maxAccAchieved - 0.05) {
+				printf("model deteriorated too much stopping training\n");
+				userSimulator->RestoreBestParameters();
+				break;
+			}
+			if (currentAcc >= desiredAcc) {
+				printf("%f accuarcy reached...\n", desiredAcc);
+				break;
+			}
 		}
 
 	}
@@ -359,7 +363,7 @@ int main() {
 		for (int i = 0; i < sequenceLength - splitInputIntegers.size(); i++) {
 			//clickPredictor->ForwardProp()
 			//int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false).back());
-			int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false, 5).back());
+			int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false, 4).back());
 
 			// randomness experiment
 			//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i % 5 == 0 ? 2 : predictedClassID));
@@ -713,11 +717,9 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 	int firstClickID = -1;
 	int classID = -1;
 
-	//std::queue<int> topNIDs;
+	//only add them if probability is high enough eg. equal distribution most extreme case
+	double minTopNProbabilitiesThreshold = selectNTopClasses > 1 ? 1 / (double)allClasses : 0;
 	// class id --------- probability
-	//std::queue<std::tuple<int, int>> topNIDs;
-	//only add them if probability is high enough, eg. >= 100%/selectNTopClasses
-	double minTopNProbabilitiesThreshold = selectNTopClasses > 1 ? 1 / (double)selectNTopClasses : 0;
 	std::deque<std::tuple<int, double>> topNIDs;
 
 	if (!trainMode)
@@ -774,20 +776,27 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 				//	std::sort(topNIDs.begin(), topNIDs.end());
 				//}
 
+				//classID = i;
+				//double classProbability = lastTimeStep(i, 0);
+
 				if (lastTimeStep(i, 0) > std::get<1>(topNIDs.front()))
 				{
 					std::tuple<int, double>& tupleToChange = topNIDs.front();
-					classID = -1;
-					double classProbability = 0;
+					//classID = -1;
+					//double classProbability = 0;
 
 					for (std::tuple<int, double>& tuple : topNIDs) {
 						if (lastTimeStep(i, 0) > std::get<1>(tuple)) tupleToChange = tuple;
-						classID = i;
-						classProbability = lastTimeStep(i, 0);
+						else break;
+						/*classID = i;
+						classProbability = lastTimeStep(i, 0);*/
 					}
 
-					std::get<0>(tupleToChange) = classID;
-					std::get<1>(tupleToChange) = classProbability;
+					/*std::get<0>(tupleToChange) = classID;
+					std::get<1>(tupleToChange) = classProbability;*/
+
+					std::get<0>(tupleToChange) = i;
+					std::get<1>(tupleToChange) = lastTimeStep(i, 0);
 				}
 			}
 		}
@@ -817,4 +826,20 @@ void UserSimulator::PrintPredictedClassProbabilities() {
 	for (int i = 0; i < _outputValues[_outputValues.size() - 1].GetRows(); i++) {
 		std::cout << "classID " << i << " " << _outputValues[_outputValues.size() - 1](i, 0) * 100 << "%" << std::endl;
 	}
+}
+
+void UserSimulator::CopyParameters() {
+	_inputWeightsCopy = _inputWeights;
+	_hiddenWeightsCopy = _hiddenWeights;
+	_weightsOutputCopy = _weightsOutput;
+	_biasesHiddenCopy = _biasesHidden;
+	_biasesOutputCopy = _biasesOutput;
+}
+
+void UserSimulator::RestoreBestParameters() {
+	_inputWeights = _inputWeightsCopy;
+	_hiddenWeights = _hiddenWeightsCopy;
+	_weightsOutput = _weightsOutputCopy;
+	_biasesHidden = _biasesHiddenCopy;
+	_biasesOutput = _biasesOutputCopy;
 }
