@@ -1,7 +1,0 @@
-﻿  UserSimulator.cpp
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(189,22): warning C4244: 'initializing': conversion from 'double' to 'int', possible loss of data
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(190,24): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(195,17): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(254,29): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\UserSimulator\UserSimulator.cpp(621,13): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
-  UserSimulator.vcxproj -> C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\x64\Debug\UserSimulator.exe
