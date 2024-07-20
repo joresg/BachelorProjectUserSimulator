@@ -3,7 +3,7 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses) {
-	_learningRate.push_back(0.001);
+	//_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
 	_learningRate.push_back(0.00001);
 	_learningRate.push_back(0.000001);
@@ -23,7 +23,7 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 	_batchSize.push_back(8);
 	_batchSize.push_back(16);
 	_batchSize.push_back(32);
-	_batchSize.push_back(64);
+	//_batchSize.push_back(64);
 }
 
 std::vector<std::tuple<double, int, int, int>> HyperParamGrid::HyperParameterGridSearch() {

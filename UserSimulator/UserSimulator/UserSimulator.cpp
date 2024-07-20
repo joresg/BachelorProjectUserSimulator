@@ -174,8 +174,6 @@ int main() {
 
 	bool verboseMode = false;
 
-	cudaDeviceReset();
-
 	FileManager* fileManager = new FileManager();
 	std::vector<std::vector<int>> allSequencesFromFile;
 	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
@@ -190,6 +188,8 @@ int main() {
 
 	// learning rate, hidden units, seq length, batch size
 	for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
+
+		cudaDeviceReset();
 
 		readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)", true, std::get<2>(paramCombo));
 		allSequencesFromFile = std::get<0>(readFileRes);
@@ -224,6 +224,8 @@ int main() {
 		double maxAccAchieved = 0;
 		double desiredAcc = 0.8;
 
+		printf("learning rate: %f, hidden units: %d, seq length: %d, batch size: %d\n", std::get<0>(paramCombo), std::get<1>(paramCombo), std::get<2>(paramCombo), std::get<3>(paramCombo));
+
 		while (true) {
 
 			std::cout << "EPOCH: " << currentEpoch + 1 << std::endl;
@@ -247,7 +249,7 @@ int main() {
 				if (k > 0 && k % (int)(trainingExamplesCount * 0.1) == 0) {
 					std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
 				}
-				printf("iteration: %d / %d\n", k, trainingExamplesCount);
+				//printf("iteration: %d / %d\n", k, trainingExamplesCount);
 
 				userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true);
 			}
@@ -478,11 +480,9 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 		_biasesOutput(i, 0) = randomBias;
 	}
 
-	printf("BIASES OUTPUT AFTER INIT\n");
-	_biasesOutput.Print();
-	_biasesHidden.Print();
-
 	//_biasesOutput.Print();
+
+	CopyParameters();
 }
 
 double UserSimulator::EvaluateOnValidateSet() {
