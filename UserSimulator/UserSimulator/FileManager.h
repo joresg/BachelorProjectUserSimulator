@@ -11,4 +11,5 @@ class FileManager
 public:
 	//Eigen::MatrixXi ReadCSVFile(const char* filePath, bool isTrainData);
 	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> ReadTXTFile(const char* filePath, bool isTrainData, int trainingSeqLength);
+	std::map<std::string, int> AllClassesFromFile(const char* filePath);
 };

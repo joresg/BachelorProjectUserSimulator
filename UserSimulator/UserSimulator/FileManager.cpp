@@ -50,7 +50,7 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 	int seqOverlap = seqLength - 1;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = 1000;
+	int limitLines = 500;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
@@ -100,4 +100,37 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 	}
 
 	return std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>>(allSequences, cmdIDs);
+}
+
+std::map<std::string, int> FileManager::AllClassesFromFile(const char* filePath) {
+	std::vector<std::vector<int>> allSequences;
+
+	std::ifstream infile(filePath);
+	std::string line;
+	int cmdID = -1;
+	int generatedID = 0;
+	int limitLines = 500;
+
+	std::cout << "READING TXT FILE: " << filePath << std::endl;
+
+	std::map<std::string, int> cmdIDs;
+
+	while (std::getline(infile, line)) {
+		if (limitLines == 0) break;
+
+		// check if cmd already in map if not add with new ID
+
+		if (cmdIDs.count(line)) {
+			cmdID = cmdIDs[line];
+		}
+		else {
+			cmdID = generatedID;
+			cmdIDs.insert({ line, cmdID });
+			generatedID++;
+		}
+
+		limitLines--;
+	}
+
+	return cmdIDs;
 }

@@ -83,12 +83,14 @@
   <ItemGroup>
     <ClInclude Include="CUDAMatrix.h" />
     <ClInclude Include="FileManager.h" />
+    <ClInclude Include="HyperParamGrid.h" />
     <ClInclude Include="MathHandler.cuh" />
     <ClInclude Include="UserSimulator.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="CUDAMatrix.cpp" />
     <ClCompile Include="FileManager.cpp" />
+    <ClCompile Include="HyperParamGrid.cpp" />
     <ClCompile Include="UserSimulator.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

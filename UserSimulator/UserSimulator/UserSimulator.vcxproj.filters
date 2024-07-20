@@ -7,11 +7,13 @@
     <ClCompile Include="FileManager.cpp" />
     <ClCompile Include="UserSimulator.cpp" />
     <ClCompile Include="CUDAMatrix.cpp" />
+    <ClCompile Include="HyperParamGrid.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FileManager.h" />
     <ClInclude Include="MathHandler.cuh" />
     <ClInclude Include="UserSimulator.h" />
     <ClInclude Include="CUDAMatrix.h" />
+    <ClInclude Include="HyperParamGrid.h" />
   </ItemGroup>
 </Project>

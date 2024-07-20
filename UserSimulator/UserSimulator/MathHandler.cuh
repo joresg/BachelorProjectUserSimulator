@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <queue>
 #include <chrono>
+#include <vector>
 
 //#include <cuda_runtime.h>
 //#include <algorithm>

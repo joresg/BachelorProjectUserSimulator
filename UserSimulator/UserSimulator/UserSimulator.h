@@ -1,12 +1,10 @@
 #include "MathHandler.cuh"
 
-#include <vector>
-
 #pragma once
 class UserSimulator
 {
 public:
-	UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize);
+	UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
 	double EvaluateOnValidateSet();
 	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses = 1);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
@@ -37,6 +35,11 @@ public:
 
 	void CopyParameters();
 	void RestoreBestParameters();
+	void SetLearningRate(double lr) { _learningRate = lr; }
+	void SetModelAccOnValidationData(double accuracy) { _modelAccuracy = accuracy; }
+	double GetModelACcOnValidationData() { return _modelAccuracy; }
+	void SetTrainingSequenceLength(int seqLength) { _trainingSeqLength = seqLength; }
+	int GetTrainingSequenceLength() { return _trainingSeqLength; }
 
 private:
 	MathHandler* _mathHandler;
@@ -70,6 +73,8 @@ private:
 	int _batchSize;
 	int _allTrainingExamplesCount;
 	int _allClasses;
+	double _modelAccuracy;
+	int _trainingSeqLength;
 
 	std::vector<std::vector<int>> _validationSet;
 };
