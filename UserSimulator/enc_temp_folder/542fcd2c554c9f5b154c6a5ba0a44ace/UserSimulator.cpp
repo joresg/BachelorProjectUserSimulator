@@ -721,6 +721,12 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 
 			// Accumulate gradients for hidden layer weights and biases
 			if (t > 0) {
+				/*if (layer == 0) {
+					hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer]);
+				}
+				else {
+					hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer - 1]);
+				}*/
 				hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer]);
 				hiddenBiasGrad[layer] += hiddenGrad;
 			}
