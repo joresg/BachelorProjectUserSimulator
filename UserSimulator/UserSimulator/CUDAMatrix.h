@@ -18,6 +18,7 @@ public:
 
 	CUDAMatrix tanh();
 	CUDAMatrix exp();
+	CUDAMatrix transpose();
 	CUDAMatrix RowAverage();
 	CUDAMatrix RowAverageMatrix();
 

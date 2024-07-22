@@ -359,6 +359,11 @@ CUDAMatrix CUDAMatrix::exp() {
     return applyExpToMatrix(this);
 }
 
+CUDAMatrix CUDAMatrix::transpose() {
+    CUDAMatrix inputMatrix = *this;
+    return transposeMatrix(inputMatrix);
+}
+
 CUDAMatrix CUDAMatrix::RowAverageMatrix() {
     return MatrixFromRowAverage(this);
 }

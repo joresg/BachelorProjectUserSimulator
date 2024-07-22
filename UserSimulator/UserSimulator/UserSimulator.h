@@ -4,7 +4,7 @@
 class UserSimulator
 {
 public:
-	UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
+	UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
 	double EvaluateOnValidateSet();
 	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses = 1);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
@@ -18,21 +18,20 @@ public:
 	void SetValidationSet(std::vector<std::vector<int>> validationSet) { _validationSet = validationSet; }
 	void PrintAllParameters() {
 		printf("_inputWeights\n");
-		_inputWeights.Print();
+		//_inputWeights.Print();
 		printf("_hiddenWeights\n");
-		_hiddenWeights.Print();
+		//_hiddenWeights.Print();
 		printf("_weightsOutput\n");
 		_weightsOutput.Print();
 		printf("_biasesHidden\n");
-		_biasesHidden.Print();
+		//_biasesHidden.Print();
 		printf("_batchBiasesHidden\n");
-		_batchBiasesHidden.Print();
+		//_batchBiasesHidden.Print();
 		printf("_biasesOutput\n");
 		_biasesOutput.Print();
 		printf("_batchBiasesOutput\n");
 		_batchBiasesOutput.Print();
 	}
-
 	void CopyParameters();
 	void RestoreBestParameters();
 	void SetLearningRate(double lr) { _learningRate = lr; }
@@ -44,21 +43,21 @@ public:
 private:
 	MathHandler* _mathHandler;
 
-	CUDAMatrix _inputWeights;
-	CUDAMatrix _hiddenWeights;
+	std::vector<CUDAMatrix> _inputWeights;
+	std::vector<CUDAMatrix> _hiddenWeights;
 	CUDAMatrix _weightsOutput;
-	CUDAMatrix _biasesHidden;
-	CUDAMatrix _batchBiasesHidden;
+	std::vector<CUDAMatrix> _biasesHidden;
+	std::vector<CUDAMatrix> _batchBiasesHidden;
 	CUDAMatrix _biasesOutput;
 	CUDAMatrix _batchBiasesOutput;
 
-	CUDAMatrix _inputWeightsCopy;
-	CUDAMatrix _hiddenWeightsCopy;
+	std::vector<CUDAMatrix> _inputWeightsCopy;
+	std::vector<CUDAMatrix> _hiddenWeightsCopy;
 	CUDAMatrix _weightsOutputCopy;
-	CUDAMatrix _biasesHiddenCopy;
+	std::vector<CUDAMatrix> _biasesHiddenCopy;
 	CUDAMatrix _biasesOutputCopy;
 
-	std::vector<CUDAMatrix> _hiddenStepValues;
+	std::vector<std::vector<CUDAMatrix>> _hiddenStepValues;
 	std::vector<CUDAMatrix> _outputValues;
 	std::vector<CUDAMatrix> _oneHotEncodedClicks;
 
@@ -67,7 +66,7 @@ private:
 	//std::vector<CUDAMatrix> _oneHotEncodedClicks;
 
 	int _inputNeurons;
-	int _hiddenLayerNeurons;
+	std::vector<int> _hiddenLayerNeurons;
 	int _outputNeurons;
 	double _learningRate;
 	int _batchSize;

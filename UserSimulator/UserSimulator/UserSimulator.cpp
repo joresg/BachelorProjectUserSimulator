@@ -1,6 +1,8 @@
 #include "UserSimulator.h"
 #include "FileManager.h"
 #include "HyperParamGrid.h"
+#include <numeric>
+#include <string>
 
 #include <stdio.h>
 
@@ -201,8 +203,11 @@ int main() {
 
 		std::vector<std::vector<int>> trainingSet;
 		std::vector<std::vector<int>> validationSet;
-		
+
+		// TODO restore dynamic batch size
 		UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
+		//UserSimulator* userSimulator = new UserSimulator(inputNeurons, { allClasses, allClasses / 2, allClasses / 4 }, outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
+		//UserSimulator* userSimulator = new UserSimulator(inputNeurons, { allClasses }, outputNeurons, 0.01, std::get<3>(paramCombo), std::get<2>(paramCombo));
 
 		std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
 
@@ -222,12 +227,26 @@ int main() {
 		int currentEpoch = 0;
 		int maxAccEpoch = 0;
 		double maxAccAchieved = 0;
-		double desiredAcc = 0.8;
+		double desiredAcc = 0.75;
+		int progress = 1;
 
-		printf("learning rate: %f, hidden units: %d, seq length: %d, batch size: %d\n", std::get<0>(paramCombo), std::get<1>(paramCombo), std::get<2>(paramCombo), std::get<3>(paramCombo));
+		std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string(),
+			[](const std::string& a, int b) {
+				return a.empty() ? std::to_string(b) : a + "," + std::to_string(b);
+			});
+
+		/*std::vector<int> tempHiddenNeurons = {allClasses, allClasses / 2, allClasses / 4};
+
+		hiddenNeuronsString = std::accumulate(tempHiddenNeurons.begin(), tempHiddenNeurons.end(), std::string(),
+			[](const std::string& a, int b) {
+				return a.empty() ? std::to_string(b) : a + "," + std::to_string(b);
+			});*/
+
+		printf("learning rate: %f, allClasses: %d, hidden units: {%s}, seq length: %d, batch size: %d\n", std::get<0>(paramCombo), allClasses, hiddenNeuronsString.c_str(), std::get<2>(paramCombo), std::get<3>(paramCombo));
+		printf("best model so far: %f\n", bestModel != nullptr ? bestModel->GetModelACcOnValidationData() : -1);
 
 		while (true) {
-
+			progress = 1;
 			std::cout << "EPOCH: " << currentEpoch + 1 << std::endl;
 
 			// BATCH IMPLEMENTATION
@@ -246,34 +265,37 @@ int main() {
 				std::vector<std::vector<int>> newVec(first, last);
 				std::vector<CUDAMatrix> oneHotEncodedInput = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, allClasses, batchSize);
 
-				if (k > 0 && k % (int)(trainingExamplesCount * 0.1) == 0) {
+				//if (k > 0 && k % (int)(trainingExamplesCount * 0.1) == 0) {
+				if (k > 0 && k / (int)(trainingExamplesCount * 0.1) >= progress) {
 					std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
+					progress++;
 				}
 				//printf("iteration: %d / %d\n", k, trainingExamplesCount);
 
 				userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true);
+				//std::deque<std::tuple<int, double>> predictedClickTestXY = userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, false, verboseMode, false);
 			}
 
 			// run validation for early stoppping
 
-			if (currentEpoch >= 2)
+			if (currentEpoch >= 0)
 			{
 				double currentAcc = userSimulator->EvaluateOnValidateSet();
 				if (currentAcc >= desiredAcc) {
 					printf("%f accuarcy reached...\n", desiredAcc);
 					break;
 				}
-				else if (currentAcc < maxAccAchieved + 0.015 && currentEpoch - maxAccEpoch > 1) {
+				else if (currentAcc < maxAccAchieved + 0.05 && currentEpoch - maxAccEpoch >= 4) {
 					printf("learning converged....\n");
 					userSimulator->RestoreBestParameters();
 					break;
 				}
-				else if (currentAcc > maxAccAchieved) {
+				else if (currentAcc > maxAccAchieved + 0.005) {
 					maxAccAchieved = currentAcc;
 					maxAccEpoch = currentEpoch;
 					userSimulator->CopyParameters();
 				}
-				else if (currentAcc < maxAccAchieved - 0.02) {
+				else if (currentAcc < maxAccAchieved - 0.15) {
 					printf("model deteriorated too much stopping training\n");
 					userSimulator->RestoreBestParameters();
 					break;
@@ -350,7 +372,7 @@ int main() {
 		for (int i = 0; i < sequenceLength - splitInputIntegers.size(); i++) {
 			//clickPredictor->ForwardProp()
 			//int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false).back());
-			int predictedClassID = std::get<0>(bestModel->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false, 4).back());
+			int predictedClassID = std::get<0>(bestModel->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false, 20).back());
 
 			// randomness experiment
 			//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i % 5 == 0 ? 2 : predictedClassID));
@@ -399,9 +421,26 @@ int main() {
 	return 0;
 }
 
-UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : _inputWeights(hiddenLayerNeurons, inputNeurons),
-	_hiddenWeights(hiddenLayerNeurons, hiddenLayerNeurons), _weightsOutput(outputNeurons, hiddenLayerNeurons), _biasesHidden(hiddenLayerNeurons, 1), _biasesOutput(outputNeurons, 1), _batchSize(batchSize),
-	_batchBiasesHidden(hiddenLayerNeurons, batchSize), _batchBiasesOutput(outputNeurons, batchSize), _allTrainingExamplesCount(-1) {
+UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : _weightsOutput(outputNeurons, hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]), _biasesOutput(outputNeurons, 1), _batchSize(batchSize),
+	_batchBiasesOutput(outputNeurons, batchSize), _allTrainingExamplesCount(-1) {
+
+	// on stack or heap, memory should be managed either way through destructor...
+	bool firstHiddenLayer = true;
+	int prevHlc = 0;
+	for (int i : hiddenLayerNeurons) {
+		if (firstHiddenLayer) {
+			_inputWeights.push_back(CUDAMatrix(i, inputNeurons));
+			firstHiddenLayer = false;
+		}
+		else {
+			_inputWeights.push_back(CUDAMatrix(hiddenLayerNeurons[prevHlc], i));
+			prevHlc++;
+		}
+		_hiddenWeights.push_back(CUDAMatrix(i, i));
+		_biasesHidden.push_back(CUDAMatrix(i, 1));
+		_batchBiasesHidden.push_back(CUDAMatrix(i, batchSize));
+	}
+
 
 	_learningRate = learningRate;
 	_inputNeurons = inputNeurons;
@@ -422,9 +461,11 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 
 	// init input weigths
 	//_inputWeights.Resize(hiddenLayerNeurons, inputNeurons);
-	for (int i = 0; i < _inputWeights.GetRows(); i++) {
-		for (int j = 0; j < _inputWeights.GetColumns(); j++) {
-			_inputWeights(i, j) = unif(re) / 5 - 0.1;
+	for (int iwc = 0; iwc < hiddenLayerNeurons.size(); iwc++) {
+		for (int i = 0; i < _inputWeights[iwc].GetRows(); i++) {
+			for (int j = 0; j < _inputWeights[iwc].GetColumns(); j++) {
+				_inputWeights[iwc](i, j) = unif(re) / 5 - 0.1;
+			}
 		}
 	}
 
@@ -432,9 +473,11 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 
 	// init hidden/recurrent weights
 	//_hiddenWeights.Resize(hiddenLayerNeurons, hiddenLayerNeurons);
-	for (int i = 0; i < _hiddenWeights.GetRows(); i++) {
-		for (int j = 0; j < _hiddenWeights.GetColumns(); j++) {
-			_hiddenWeights(i, j) = unif(re) / 5 - 0.1;
+	for (int hwc = 0; hwc < hiddenLayerNeurons.size(); hwc++) {
+		for (int i = 0; i < _hiddenWeights[hwc].GetRows(); i++) {
+			for (int j = 0; j < _hiddenWeights[hwc].GetColumns(); j++) {
+				_hiddenWeights[hwc](i, j) = unif(re) / 5 - 0.1;
+			}
 		}
 	}
 
@@ -457,13 +500,15 @@ UserSimulator::UserSimulator(int inputNeurons, int hiddenLayerNeurons, int outpu
 
 	// biases for hidden layer
 	//_biasesHidden.Resize(hiddenLayerNeurons, 1);
-	for (int i = 0; i < hiddenLayerNeurons; i++) {
-		double randomBias = unif(re) / 5 - 0.1;
-		for (int j = 0; j < batchSize; j++) {
-			_batchBiasesHidden(i, j) = randomBias;
+	for (int hbc = 0; hbc < hiddenLayerNeurons.size(); hbc++) {
+		for (int i = 0; i < hiddenLayerNeurons[hbc]; i++) {
+			double randomBias = unif(re) / 5 - 0.1;
+			for (int j = 0; j < batchSize; j++) {
+				_batchBiasesHidden[hbc](i, j) = randomBias;
+			}
+			//_biasesHidden(i, 0) = unif(re) / 5 - 0.1;
+			_biasesHidden[hbc](i, 0) = randomBias;
 		}
-		//_biasesHidden(i, 0) = unif(re) / 5 - 0.1;
-		_biasesHidden(i, 0) = randomBias;
 	}
 
 	//_biasesHidden.Print();
@@ -498,10 +543,13 @@ double UserSimulator::EvaluateOnValidateSet() {
 			std::vector<CUDAMatrix>::const_iterator last = oneHotEncodedValidationClickSequenceExample.begin() + j + 1;
 			std::vector<CUDAMatrix> slicedClicks(first, last);
 
-			std::deque<std::tuple<int, double>> predictedClicks = PredictNextClickFromSequence(slicedClicks, false, false, false, 4);
+			std::deque<std::tuple<int, double>> predictedClicks = PredictNextClickFromSequence(slicedClicks, false, false, false, 10);
 			allTests++;
 			for (std::tuple<int, double> const &classIDAndProb : predictedClicks) {
-				if (std::get<0>(classIDAndProb) == _validationSet[i][j + 1]) correctPredictions++;
+				if (std::get<0>(classIDAndProb) == _validationSet[i][j + 1]) {
+					correctPredictions++;
+					break;
+				}
 			}
 		}
 	}
@@ -515,7 +563,10 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 	//_inputWeights.Print();
 	//printf("onehotEncodedInput\n");
 	//onehotEncodedInput.Print();
-	CUDAMatrix XI = _inputWeights * onehotEncodedInput;
+
+	std::vector<CUDAMatrix> allHiddenLayers;
+
+	CUDAMatrix XI = _inputWeights[0] * onehotEncodedInput;
 	//XI.Print();
 	CUDAMatrix XHCurrentTimeStep;
 	// if first element in sequence XHidden at previous time step non existent, just take XI(nput)
@@ -523,19 +574,38 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 		XHCurrentTimeStep = XI;
 	}
 	else {
-		//XHCurrentTimeStep = XI + (_hiddenWeights * _hiddenStepValues[sequencePosition - 1]) + _biasesHidden;
-		XHCurrentTimeStep = XI + (_hiddenWeights * _hiddenStepValues[sequencePosition - 1]) + (trainMode ? _batchBiasesHidden : _biasesHidden);
+		XHCurrentTimeStep = XI + (_hiddenWeights[0] * _hiddenStepValues[sequencePosition - 1][0]);
 	}
 
-	//CUDAMatrix XHCurrentTimeStepT = _mathHandler->TransposeMatrix(XHCurrentTimeStep);
-	/*CUDAMatrix XHCurrentTimeStepTanh = XHCurrentTimeStep;
-	XHCurrentTimeStepTanh.tanh();
-	CUDAMatrix activatedHiddenLayer = XHCurrentTimeStepTanh;*/
+	XHCurrentTimeStep += trainMode ? _batchBiasesHidden[0] : _biasesHidden[0];
+
 	CUDAMatrix activatedHiddenLayer = XHCurrentTimeStep.tanh();
 	//printf("activatedHiddenLayer\n");
 	//activatedHiddenLayer.Print();
-	_hiddenStepValues.push_back(activatedHiddenLayer);
 
+	//_hiddenStepValues.push_back(activatedHiddenLayer);
+	allHiddenLayers.push_back(activatedHiddenLayer);
+
+	// rest of the hidden layers
+	// not single layer anymore propagate through all N hidden layers now...
+	for (int i = 1; i < _hiddenWeights.size(); i++) {
+		XI = _inputWeights[i].transpose() * allHiddenLayers[allHiddenLayers.size() - 1];
+		// if first element in sequence XHidden at previous time step non existent, just take XI(nput)
+		if (sequencePosition == 0) {
+			XHCurrentTimeStep = XI;
+		}
+		else {
+			//XHCurrentTimeStep = XI + (_hiddenWeights * _hiddenStepValues[sequencePosition - 1]) + _biasesHidden;
+			XHCurrentTimeStep = XI + (_hiddenWeights[i] * _hiddenStepValues[sequencePosition - 1][i]);
+		}
+
+		XHCurrentTimeStep += trainMode ? _batchBiasesHidden[i] : _biasesHidden[i];
+
+		activatedHiddenLayer = XHCurrentTimeStep.tanh();
+		allHiddenLayers.push_back(activatedHiddenLayer);
+	}
+
+	_hiddenStepValues.push_back(allHiddenLayers);
 
 	// compute output
 
@@ -613,63 +683,83 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	// Initialize gradients
 	CUDAMatrix outputWeightsGrad = CUDAMatrix::Zero(_weightsOutput.GetRows(), _weightsOutput.GetColumns());
 	CUDAMatrix outputBiasGrad = CUDAMatrix::Zero(_outputNeurons, this->_batchSize);
-	//CUDAMatrix outputBiasGrad = CUDAMatrix::Zero(_outputNeurons, 1);
-	CUDAMatrix hiddenWeightsGrad = CUDAMatrix::Zero(_hiddenWeights.GetRows(), _hiddenWeights.GetColumns());
-	CUDAMatrix hiddenBiasGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, this->_batchSize);
-	//CUDAMatrix hiddenBiasGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, 1);
-	CUDAMatrix inputWeightsGrad = CUDAMatrix::Zero(_inputWeights.GetRows(), _inputWeights.GetColumns());
+	std::deque<CUDAMatrix> hiddenWeightsGrad(_hiddenWeights.size());
+	std::deque<CUDAMatrix> hiddenBiasGrad(_hiddenWeights.size());
+	std::deque<CUDAMatrix> inputWeightsGrad(_inputWeights.size());
+	std::deque<CUDAMatrix> nextHiddenGrad(_hiddenWeights.size());
 
-	CUDAMatrix nextHiddenGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, this->_batchSize);
-	//CUDAMatrix nextHiddenGrad = CUDAMatrix::Zero(_hiddenLayerNeurons, 1);
-
-	// Iterate over each timestep from last to first
-	for (int i = _outputValues.size() - 1; i >= 0; i--) {
-		// Cross-entropy loss gradient w.r.t. softmax input
-		CUDAMatrix lossGrad = _outputValues[i] - oneHotEncodedLabels[i + 1]; // Gradient of softmax + cross-entropy
-		
-		// Gradients for the output layer
-		//outputWeightsGrad += lossGrad.RowAverage() * _mathHandler->TransposeMatrix(_hiddenStepValues[i]);
-		outputWeightsGrad += lossGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[i]);
-
-		outputBiasGrad += lossGrad;
-
-		// Backpropagate into the hidden layer
-		CUDAMatrix outputGrad = _mathHandler->TransposeMatrix(_weightsOutput) * lossGrad;
-		CUDAMatrix hiddenGrad = outputGrad + _mathHandler->TransposeMatrix(_hiddenWeights) * nextHiddenGrad;
-		CUDAMatrix tanhDerivative = _mathHandler->TanhDerivative(_hiddenStepValues[i]);
-
-		hiddenGrad = hiddenGrad.Array() * tanhDerivative.Array();
-
-		// Accumulate gradients for hidden layer weights and biases
-		if (i > 0) {
-			hiddenWeightsGrad += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[i - 1]);
-			hiddenBiasGrad += hiddenGrad;
-		}
-
-		// Accumulate gradients for input weights
-		inputWeightsGrad += hiddenGrad * _mathHandler->TransposeMatrix(_oneHotEncodedClicks[i]);
-
-		// Update nextHiddenGrad for the next iteration
-		nextHiddenGrad = hiddenGrad;
+	for (int i = 0; i < _hiddenWeights.size(); i++) {
+		hiddenWeightsGrad[i] = CUDAMatrix::Zero(_hiddenWeights[i].GetRows(), _hiddenWeights[i].GetColumns());
+		hiddenBiasGrad[i] = CUDAMatrix::Zero(_hiddenLayerNeurons[i], this->_batchSize);
+		inputWeightsGrad[i] = CUDAMatrix::Zero(_inputWeights[i].GetRows(), _inputWeights[i].GetColumns());
+		nextHiddenGrad[i] = CUDAMatrix::Zero(_hiddenLayerNeurons[i], this->_batchSize);
 	}
 
-	/*printf("outputBiasGrad.........\n");
-	outputBiasGrad.Print();*/
+	// Iterate over each timestep from last to first
+	for (int t = _outputValues.size() - 1; t >= 0; t--) {
+		// Cross-entropy loss gradient w.r.t. softmax input
+		CUDAMatrix lossGrad = _outputValues[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
+
+		// Gradients for the output layer
+		outputWeightsGrad += lossGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t].back());
+		outputBiasGrad += lossGrad;
+
+		// Backpropagate into the hidden layers
+		CUDAMatrix outputGrad = _mathHandler->TransposeMatrix(_weightsOutput) * lossGrad;
+
+		for (int layer = _hiddenWeights.size() - 1; layer >= 0; layer--) {
+			CUDAMatrix hiddenGrad;
+			if (layer == _hiddenWeights.size() - 1) {
+				hiddenGrad = outputGrad + _mathHandler->TransposeMatrix(_hiddenWeights[layer]) * nextHiddenGrad[layer];
+			}
+			else {
+				hiddenGrad = _mathHandler->TransposeMatrix(_hiddenWeights[layer]) * nextHiddenGrad[layer];
+			}
+
+			CUDAMatrix tanhDerivative = _mathHandler->TanhDerivative(_hiddenStepValues[t][layer]);
+			hiddenGrad = hiddenGrad.Array() * tanhDerivative.Array();
+
+			// Accumulate gradients for hidden layer weights and biases
+			if (t > 0) {
+				if (layer == 0) {
+					hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer]);
+				}
+				else {
+					hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer - 1]);
+				}
+				hiddenBiasGrad[layer] += hiddenGrad;
+			}
+
+			// Accumulate gradients for input weights
+			if (layer == 0) {
+				inputWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_oneHotEncodedClicks[t]);
+			}
+
+			// Update nextHiddenGrad for the next iteration
+			nextHiddenGrad[layer] = hiddenGrad;
+		}
+	}
 
 	// Apply learning rate adjustment
 	double adjustedLearningRate = learningRate * std::sqrt(_batchSize);
-	//double adjustedLearningRate = learningRate / _outputValues.size();
 
-	//inputWeightsGrad.Print();
+	for (int i = 0; i < _inputWeights.size(); i++) {
+		_inputWeights[i] -= inputWeightsGrad[i] * (1.0 / _batchSize) * adjustedLearningRate;
+	}
 
-	_inputWeights -= inputWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
-	_hiddenWeights -= hiddenWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
-	_biasesHidden -= hiddenBiasGrad.RowAverage() * adjustedLearningRate;
+	for (int i = 0; i < _hiddenWeights.size(); i++) {
+		_hiddenWeights[i] -= hiddenWeightsGrad[i] * (1.0 / _batchSize) * adjustedLearningRate;
+		_biasesHidden[i] -= hiddenBiasGrad[i].RowAverage() * adjustedLearningRate;
+	}
+
 	_weightsOutput -= outputWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
 	_biasesOutput -= outputBiasGrad.RowAverage() * adjustedLearningRate;
 
-	_batchBiasesHidden -= hiddenBiasGrad.RowAverageMatrix() * adjustedLearningRate;
 	_batchBiasesOutput -= outputBiasGrad.RowAverageMatrix() * adjustedLearningRate;
+
+	for (int i = 0; i < _batchBiasesHidden.size(); i++) {
+		_batchBiasesHidden[i] -= hiddenBiasGrad[i].RowAverageMatrix() * adjustedLearningRate;
+	}
 }
 
 std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses) {
@@ -800,8 +890,10 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 		return std::get<1>(a) < std::get<1>(b);
 	});
 	
+	// todo make min threshold optional, for now take if prob more than 1%
 	while (!topNIDs.empty()) {
-		if (std::get<1>(topNIDs.front()) > minTopNProbabilitiesThreshold) break;
+		//if (std::get<1>(topNIDs.front()) > minTopNProbabilitiesThreshold) break;
+		if (std::get<1>(topNIDs.front()) > 0.01) break;
 		topNIDs.pop_front();
 	}
 
