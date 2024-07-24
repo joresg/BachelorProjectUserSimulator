@@ -14,6 +14,5 @@ public:
 	HyperParamGrid(int allClasses);
 
 	std::vector<std::tuple<double, std::vector<int>, int, int>> HyperParameterGridSearch();
-	void HyperParameterGridSearchParametersPrint();
 };
 

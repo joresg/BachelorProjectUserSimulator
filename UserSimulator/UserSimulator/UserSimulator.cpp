@@ -204,10 +204,8 @@ int main() {
 		std::vector<std::vector<int>> trainingSet;
 		std::vector<std::vector<int>> validationSet;
 
-		// TODO restore dynamic batch size
-		UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
-		//UserSimulator* userSimulator = new UserSimulator(inputNeurons, { allClasses, allClasses / 2, allClasses / 4 }, outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
-		//UserSimulator* userSimulator = new UserSimulator(inputNeurons, { allClasses }, outputNeurons, 0.01, std::get<3>(paramCombo), std::get<2>(paramCombo));
+		//UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
+		UserSimulator* userSimulator = new UserSimulator(inputNeurons, { allClasses }, outputNeurons, 0.0001, std::get<3>(paramCombo), 10);
 
 		std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
 
@@ -227,7 +225,7 @@ int main() {
 		int currentEpoch = 0;
 		int maxAccEpoch = 0;
 		double maxAccAchieved = 0;
-		double desiredAcc = 0.75;
+		double desiredAcc = 0.9;
 		int progress = 1;
 
 		std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string(),
@@ -295,7 +293,7 @@ int main() {
 					maxAccEpoch = currentEpoch;
 					userSimulator->CopyParameters();
 				}
-				else if (currentAcc < maxAccAchieved - 0.10) {
+				else if (currentAcc < maxAccAchieved - 0.10 || currentAcc < 0.05) {
 					printf("model deteriorated too much stopping training\n");
 					userSimulator->RestoreBestParameters();
 					break;
@@ -566,40 +564,27 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 
 	std::vector<CUDAMatrix> allHiddenLayers;
 
-	CUDAMatrix XI = _inputWeights[0] * onehotEncodedInput;
-	//XI.Print();
+	CUDAMatrix XI;
 	CUDAMatrix XHCurrentTimeStep;
-	// if first element in sequence XHidden at previous time step non existent, just take XI(nput)
-	if (sequencePosition == 0) {
-		XHCurrentTimeStep = XI;
-	}
-	else {
-		XHCurrentTimeStep = XI + (_hiddenWeights[0] * _hiddenStepValues[sequencePosition - 1][0]);
-	}
-
-	XHCurrentTimeStep += trainMode ? _batchBiasesHidden[0] : _biasesHidden[0];
-
-	CUDAMatrix activatedHiddenLayer = XHCurrentTimeStep.tanh();
-	//printf("activatedHiddenLayer\n");
-	//activatedHiddenLayer.Print();
-
-	//_hiddenStepValues.push_back(activatedHiddenLayer);
-	allHiddenLayers.push_back(activatedHiddenLayer);
-
-	// rest of the hidden layers
-	// not single layer anymore propagate through all N hidden layers now...
-	for (int i = 1; i < _hiddenWeights.size(); i++) {
-		XI = _inputWeights[i].transpose() * allHiddenLayers[allHiddenLayers.size() - 1];
+	CUDAMatrix activatedHiddenLayer;
+	for (int l = 0; l < _hiddenWeights.size(); l++) {
+		if (l == 0)
+		{
+			XI = _inputWeights[0] * onehotEncodedInput;
+		}
+		else {
+			XI = _inputWeights[l].transpose() * allHiddenLayers[allHiddenLayers.size() - 1];
+		}
 		// if first element in sequence XHidden at previous time step non existent, just take XI(nput)
 		if (sequencePosition == 0) {
 			XHCurrentTimeStep = XI;
 		}
 		else {
 			//XHCurrentTimeStep = XI + (_hiddenWeights * _hiddenStepValues[sequencePosition - 1]) + _biasesHidden;
-			XHCurrentTimeStep = XI + (_hiddenWeights[i] * _hiddenStepValues[sequencePosition - 1][i]);
+			XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]);
 		}
 
-		XHCurrentTimeStep += trainMode ? _batchBiasesHidden[i] : _biasesHidden[i];
+		XHCurrentTimeStep += trainMode ? _batchBiasesHidden[l] : _biasesHidden[l];
 
 		activatedHiddenLayer = XHCurrentTimeStep.tanh();
 		allHiddenLayers.push_back(activatedHiddenLayer);
@@ -609,8 +594,6 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 
 	// compute output
 
-	//CUDAMatrix outputValuesUnactivated = _weightsOutput * _mathHandler->TransposeMatrix(activatedHiddenLayer) + _biasesOutput;
-	//CUDAMatrix outputValuesUnactivated = _weightsOutput * activatedHiddenLayer + _biasesOutput;
 	CUDAMatrix outputValuesUnactivated = _weightsOutput * activatedHiddenLayer + (trainMode ? _batchBiasesOutput : _biasesOutput);
 
 	//printf("calculating sum for softmax...........\n");
@@ -635,9 +618,6 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 	//outputValuesActivated.Print();
 	//sumsForSoftmax.Print();
 
-	//outputValuesActivated = outputValues;
-	//CUDAMatrix outputValuesActivated(outputValuesUnactivated.GetRows(), _batchSize);
-
 	// use CUDA instead
 	/*for (int i = 0; i < outputValuesActivated.GetRows(); i++) {
 		outputValuesActivated(i, 0) = std::exp(outputValuesUnactivated(i, 0)) / sumForSoftmax;
@@ -659,7 +639,6 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 		std::cout << "_outputValuesActivated" << std::endl;
 		outputValuesActivated.Print();
 	}
-
 
 	// test print predicted sequence
 	double classID = -1;
@@ -691,47 +670,59 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	for (int i = 0; i < _hiddenWeights.size(); i++) {
 		hiddenWeightsGrad[i] = CUDAMatrix::Zero(_hiddenWeights[i].GetRows(), _hiddenWeights[i].GetColumns());
 		hiddenBiasGrad[i] = CUDAMatrix::Zero(_hiddenLayerNeurons[i], this->_batchSize);
-		inputWeightsGrad[i] = CUDAMatrix::Zero(_inputWeights[i].GetRows(), _inputWeights[i].GetColumns());
 		nextHiddenGrad[i] = CUDAMatrix::Zero(_hiddenLayerNeurons[i], this->_batchSize);
+	}
+
+	for (int i = 0; i < _inputWeights.size(); i++) {
+		inputWeightsGrad[i] = CUDAMatrix::Zero(_inputWeights[i].GetRows(), _inputWeights[i].GetColumns());
 	}
 
 	// Iterate over each timestep from last to first
 	for (int t = _outputValues.size() - 1; t >= 0; t--) {
 		// Cross-entropy loss gradient w.r.t. softmax input
-		CUDAMatrix lossGrad = _outputValues[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
+		CUDAMatrix outputGrad = _outputValues[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
 
 		// Gradients for the output layer
-		outputWeightsGrad += lossGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t].back());
-		outputBiasGrad += lossGrad;
+		outputWeightsGrad += outputGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t].back());
+		outputBiasGrad += outputGrad;
 
 		// Backpropagate into the hidden layers
-		CUDAMatrix outputGrad = _mathHandler->TransposeMatrix(_weightsOutput) * lossGrad;
-
+		CUDAMatrix nextLayerGradient;
+		CUDAMatrix hiddenGrad;
 		for (int layer = _hiddenWeights.size() - 1; layer >= 0; layer--) {
-			CUDAMatrix hiddenGrad;
+			//CUDAMatrix hiddenGrad;
 			if (layer == _hiddenWeights.size() - 1) {
-				hiddenGrad = outputGrad + _mathHandler->TransposeMatrix(_hiddenWeights[layer]) * nextHiddenGrad[layer];
+				hiddenGrad = (_weightsOutput.transpose() * outputGrad).Array() * _mathHandler->TanhDerivative(_hiddenStepValues[t][layer]).Array();
 			}
 			else {
-				hiddenGrad = _mathHandler->TransposeMatrix(_hiddenWeights[layer]) * nextHiddenGrad[layer];
-			}
+				if (t < _outputValues.size() - 1)
+				{
+					hiddenGrad = _inputWeights[layer + 1] * nextLayerGradient;
+				}
+				else {
+					hiddenGrad = _inputWeights[layer + 1] * nextLayerGradient + _hiddenWeights[layer].transpose() * nextHiddenGrad[layer];
+				}
 
-			CUDAMatrix tanhDerivative = _mathHandler->TanhDerivative(_hiddenStepValues[t][layer]);
-			hiddenGrad = hiddenGrad.Array() * tanhDerivative.Array();
+				hiddenGrad = hiddenGrad.Array() * _mathHandler->TanhDerivative(_hiddenStepValues[t][layer]);
+			}
 
 			// Accumulate gradients for hidden layer weights and biases
 			if (t > 0) {
 				hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer]);
-				hiddenBiasGrad[layer] += hiddenGrad;
 			}
+			hiddenBiasGrad[layer] += hiddenGrad;
 
 			// Accumulate gradients for input weights
 			if (layer == 0) {
 				inputWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_oneHotEncodedClicks[t]);
 			}
+			else if (layer < _hiddenWeights.size() - 1) {
+				inputWeightsGrad[layer] += (hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t][layer - 1])).transpose();
+			}
 
-			// Update nextHiddenGrad for the next iteration
+			// Update nextHiddenGrad for the next iteration of layer and timestep
 			nextHiddenGrad[layer] = hiddenGrad;
+			nextLayerGradient = hiddenGrad;
 		}
 	}
 

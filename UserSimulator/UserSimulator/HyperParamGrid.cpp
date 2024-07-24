@@ -4,7 +4,7 @@
 
 HyperParamGrid::HyperParamGrid(int allClasses) {
 	//_learningRate.push_back(0.01);
-	//_learningRate.push_back(0.001);
+	_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
 	_learningRate.push_back(0.00001);
 	_learningRate.push_back(0.000001);
@@ -35,10 +35,16 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 
 	std::vector<int> hiddenNeuronsCombination21;
 	std::vector<int> hiddenNeuronsCombination22;
+	std::vector<int> hiddenNeuronsCombination23;
+	std::vector<int> hiddenNeuronsCombination24;
 
 	int hiddenNuronsCount1 = allClasses / 2;
 	int hiddenNuronsCount2 = allClasses;
 	int hiddenNuronsCount3 = allClasses + (allClasses / 2);
+
+	hiddenNeuronsCombination23.push_back(hiddenNuronsCount1);
+
+	hiddenNeuronsCombination23.push_back(hiddenNuronsCount3);
 
 	hiddenNeuronsCombination21.push_back(hiddenNuronsCount2);
 
@@ -121,8 +127,11 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 	hiddenNeuronsCombination16.push_back(hiddenNuronsCount2);
 	hiddenNeuronsCombination16.push_back(hiddenNuronsCount1);
 
-	//_hiddenUnits.push_back(hiddenNeuronsCombination21);
-	//_hiddenUnits.push_back(hiddenNeuronsCombination22);
+	_hiddenUnits.push_back(hiddenNeuronsCombination23);
+	_hiddenUnits.push_back(hiddenNeuronsCombination24);
+
+	_hiddenUnits.push_back(hiddenNeuronsCombination21);
+	_hiddenUnits.push_back(hiddenNeuronsCombination22);
 
 	_hiddenUnits.push_back(hiddenNeuronsCombination17);
 	_hiddenUnits.push_back(hiddenNeuronsCombination18);
@@ -148,9 +157,9 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 
 	//_sequenceLength.push_back(5);
 	_sequenceLength.push_back(10);
-	//_sequenceLength.push_back(15);
+	_sequenceLength.push_back(15);
 	_sequenceLength.push_back(20);
-	//_sequenceLength.push_back(25);
+	_sequenceLength.push_back(25);
 	_sequenceLength.push_back(30);
 
 	_batchSize.push_back(8);
@@ -182,7 +191,4 @@ std::vector<std::tuple<double, std::vector<int>, int, int>> HyperParamGrid::Hype
 		}
 	}
 	return allHyperParamCombinations;
-}
-
-void HyperParamGrid::HyperParameterGridSearchParametersPrint() {
 }
