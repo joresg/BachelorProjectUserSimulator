@@ -204,8 +204,7 @@ int main() {
 		std::vector<std::vector<int>> trainingSet;
 		std::vector<std::vector<int>> validationSet;
 
-		//UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
-		UserSimulator* userSimulator = new UserSimulator(inputNeurons, { allClasses }, outputNeurons, 0.0001, std::get<3>(paramCombo), 10);
+		UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
 
 		std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
 
