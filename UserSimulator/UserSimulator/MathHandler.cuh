@@ -1,4 +1,3 @@
-//#include "cuda_runtime.h"
 #include <cuda_runtime.h>
 #include "device_launch_parameters.h"
 #include "CUDAMatrix.h"
@@ -11,10 +10,6 @@
 #include <queue>
 #include <chrono>
 #include <vector>
-
-//#include <cuda_runtime.h>
-//#include <algorithm>
-//#include <vector>
 
 #pragma once
 class MathHandler {

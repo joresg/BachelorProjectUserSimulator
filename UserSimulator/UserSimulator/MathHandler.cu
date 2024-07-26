@@ -32,21 +32,6 @@ __global__ void addColumnVectorToMatrix(double* matrix, double* vector, double* 
     }
 }
 
-// row average and set every element of that row to this value
-__global__ void setRowAverage(double* matrix, int M, int N) {
-    int row = blockIdx.x * blockDim.x + threadIdx.x;
-    if (row < M) {
-        double sum = 0.0;
-        for (int col = 0; col < N; ++col) {
-            sum += matrix[row * N + col];
-        }
-        double avg = sum / N;
-        for (int col = 0; col < N; ++col) {
-            matrix[row * N + col] = avg;
-        }
-    }
-}
-
 // computre row averages of matrix MxN and return row vector Mx1
 __global__ void rowAverage(const double* matrix, double* rowAvg, int M, int N) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -163,39 +148,6 @@ void AddMatrixAndColumnVec(double* matrix, double* vector, double* res, int m, i
     cudaFree(d_matrix);
     cudaFree(d_vector);
     cudaFree(d_result);
-}
-
-CUDAMatrix MatrixFromRowAverage(CUDAMatrix* mat) {
-
-    int rows = mat->GetRows();
-    int cols = mat->GetColumns();
-
-    double* resMat = new double[rows * cols];
-
-    // Allocate device memory
-    double* d_matrix;
-    cudaMalloc(&d_matrix, rows * cols * sizeof(double));
-
-    // Copy the host matrix to the device
-    cudaMemcpy(d_matrix, mat->GetUnderlyingMatrix(), rows * cols * sizeof(double), cudaMemcpyHostToDevice);
-
-    // Define block size and grid size
-    int blockSize = 256;
-    int gridSize = (rows + blockSize - 1) / blockSize;
-
-    // Launch the kernel to compute row averages and set each element to the average
-    setRowAverage << <gridSize, blockSize >> > (d_matrix, rows, cols);
-
-    // Copy the modified matrix from device to host
-    cudaMemcpy(resMat, d_matrix, rows * cols * sizeof(double), cudaMemcpyDeviceToHost);
-
-    CUDAMatrix resMatrix(rows, cols);
-    resMatrix.SetUnderlyingMatrix(resMat);
-
-    // Free device memory
-    cudaFree(d_matrix);
-
-    return resMatrix;
 }
 
 CUDAMatrix RowVectorFromRowAverage(CUDAMatrix* mat) {
@@ -403,10 +355,6 @@ CUDAMatrix CUDAMatrix::exp() {
 CUDAMatrix CUDAMatrix::transpose() {
     CUDAMatrix inputMatrix = *this;
     return transposeMatrix(inputMatrix);
-}
-
-CUDAMatrix CUDAMatrix::RowAverageMatrix() {
-    return MatrixFromRowAverage(this);
 }
 
 CUDAMatrix CUDAMatrix::RowAverage() {

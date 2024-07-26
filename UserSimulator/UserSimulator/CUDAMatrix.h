@@ -21,7 +21,6 @@ public:
 	CUDAMatrix exp();
 	CUDAMatrix transpose();
 	CUDAMatrix RowAverage();
-	CUDAMatrix RowAverageMatrix();
 
 	int GetRows() const { return _rows; }
 	int GetColumns() const { return _cols; }

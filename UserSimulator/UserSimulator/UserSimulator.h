@@ -45,6 +45,10 @@ private:
 	std::vector<CUDAMatrix> _biasesHidden;
 	CUDAMatrix _biasesOutput;
 
+	std::vector<CUDAMatrix> _velocityWeightsInput;
+	std::vector<CUDAMatrix> _velocityWeightsHidden;
+	std::vector<CUDAMatrix> _velocityBias;
+
 	std::vector<CUDAMatrix> _inputWeightsCopy;
 	std::vector<CUDAMatrix> _hiddenWeightsCopy;
 	CUDAMatrix _weightsOutputCopy;
@@ -56,8 +60,6 @@ private:
 	std::vector<CUDAMatrix> _oneHotEncodedClicks;
 
 	double _totalLoss;
-
-	//std::vector<CUDAMatrix> _oneHotEncodedClicks;
 
 	int _inputNeurons;
 	std::vector<int> _hiddenLayerNeurons;
