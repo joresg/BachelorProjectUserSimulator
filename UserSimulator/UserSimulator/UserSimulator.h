@@ -35,6 +35,7 @@ public:
 	double GetModelACcOnValidationData() { return _modelAccuracy; }
 	void SetTrainingSequenceLength(int seqLength) { _trainingSeqLength = seqLength; }
 	int GetTrainingSequenceLength() { return _trainingSeqLength; }
+	void SetBatchSize(int newBatchSize) { _batchSize = newBatchSize; }
 
 private:
 	MathHandler* _mathHandler;

@@ -249,16 +249,11 @@ int main() {
 			userSimulator->SetAllTrainingExamplesCount(trainingExamplesCount);
 
 			for (int k = 0; k < trainingExamplesCount; k += batchSize) {
-				if (k + batchSize > trainingExamplesCount - 1) {
-					// todo adjust final batch size if smaller
-					break;
-				}
 				std::vector<std::vector<int>>::const_iterator first = trainingSet.begin() + k;
-				//std::vector<std::vector<int>>::const_iterator last = trainingSet.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount - 1);
-				std::vector<std::vector<int>>::const_iterator last = trainingSet.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount - 1);
-				//std::vector<std::vector<int>>::const_iterator last = allSequencesFromFile.begin() + (k + batchSize < allSequencesFromFile.size() ? k + batchSize: 1) + batchSize;
+				std::vector<std::vector<int>>::const_iterator last = trainingSet.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount);
 				std::vector<std::vector<int>> newVec(first, last);
-				std::vector<CUDAMatrix> oneHotEncodedInput = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, allClasses, batchSize);
+				userSimulator->SetBatchSize(newVec.size());
+				std::vector<CUDAMatrix> oneHotEncodedInput = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, allClasses, userSimulator->GetBatchSize());
 
 				if (k > 0 && k / (int)(trainingExamplesCount * 0.1) >= progress) {
 					std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
@@ -268,6 +263,8 @@ int main() {
 
 				userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true);
 			}
+
+			userSimulator->SetBatchSize(batchSize);
 
 			// run validation for early stoppping
 
