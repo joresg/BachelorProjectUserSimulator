@@ -9,6 +9,7 @@ private:
 	int _cols;
 	double* _underlyingMatrix;
 	bool _arrayForm;
+	bool _vectorForm;
 public:
 	//CUDAMatrix();
 	CUDAMatrix(int rows, int cols);
@@ -34,6 +35,7 @@ public:
 	void Resize(int rows, int columns);
 	static CUDAMatrix Zero(int rows, int columns);
 	CUDAMatrix Array();
+	CUDAMatrix Vec();
 	void Destroy();
 	void Print();
 

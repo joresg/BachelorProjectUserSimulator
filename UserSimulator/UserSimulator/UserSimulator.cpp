@@ -169,9 +169,15 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 	mat2.Print();
 	mat1.Print();
 	(mat2.Array() / mat1.Array()).Print();
+
+	printf("matrix add row vec\n");
+	mat3.Print();
+	mat4.Print();
+	(mat3 + mat4.Vec()).Print();
 }
 
 int main() {
+	//CUDAMathTest(userSimulator);
 	UserSimulator* bestModel = nullptr;
 
 	bool verboseMode = false;
@@ -413,13 +419,11 @@ int main() {
 		}
 	}
 
-	//CUDAMathTest();
-
 	return 0;
 }
 
-UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : _weightsOutput(outputNeurons, hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]), _biasesOutput(outputNeurons, 1), _batchSize(batchSize),
-	_batchBiasesOutput(outputNeurons, batchSize), _allTrainingExamplesCount(-1) {
+UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : _weightsOutput(outputNeurons, 
+	hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]), _biasesOutput(outputNeurons, 1), _batchSize(batchSize), _allTrainingExamplesCount(-1) {
 
 	// on stack or heap, memory should be managed either way through destructor...
 	bool firstHiddenLayer = true;
@@ -435,9 +439,9 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeuro
 		}
 		_hiddenWeights.push_back(CUDAMatrix(i, i));
 		_biasesHidden.push_back(CUDAMatrix(i, 1));
-		_batchBiasesHidden.push_back(CUDAMatrix(i, batchSize));
 	}
 
+	_momentumCoefficient = 0.9;
 
 	_learningRate = learningRate;
 	_inputNeurons = inputNeurons;
@@ -500,9 +504,6 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeuro
 	for (int hbc = 0; hbc < hiddenLayerNeurons.size(); hbc++) {
 		for (int i = 0; i < hiddenLayerNeurons[hbc]; i++) {
 			double randomBias = unif(re) / 5 - 0.1;
-			for (int j = 0; j < batchSize; j++) {
-				_batchBiasesHidden[hbc](i, j) = randomBias;
-			}
 			//_biasesHidden(i, 0) = unif(re) / 5 - 0.1;
 			_biasesHidden[hbc](i, 0) = randomBias;
 		}
@@ -515,9 +516,6 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeuro
 	for (int i = 0; i < outputNeurons; i++) {
 		//_biasesOutput(i, 0) = unif(re) / 5 - 0.1;
 		double randomBias = unif(re);
-		for (int j = 0; j < batchSize; j++) {
-			_batchBiasesOutput(i, j) = randomBias;
-		}
 		//_biasesOutput(i, 0) = unif(re);
 		_biasesOutput(i, 0) = randomBias;
 	}
@@ -583,7 +581,7 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 			XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]);
 		}
 
-		XHCurrentTimeStep += trainMode ? _batchBiasesHidden[l] : _biasesHidden[l];
+		XHCurrentTimeStep += _biasesHidden[l].Vec();
 
 		activatedHiddenLayer = XHCurrentTimeStep.tanh();
 		allHiddenLayers.push_back(activatedHiddenLayer);
@@ -593,7 +591,7 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 
 	// compute output
 
-	CUDAMatrix outputValuesUnactivated = _weightsOutput * activatedHiddenLayer + (trainMode ? _batchBiasesOutput : _biasesOutput);
+	CUDAMatrix outputValuesUnactivated = _weightsOutput * activatedHiddenLayer + _biasesOutput.Vec();
 
 	//printf("calculating sum for softmax...........\n");
 	//outputValuesUnactivated.Print();
@@ -658,6 +656,29 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode) {
 	if (verboseMode) std::cout << "Back prop" << std::endl;
 
+	// initialize velocity for momentum
+	//int velocityWeights = 0;
+	//int velocityBias = 0;
+	std::vector<CUDAMatrix> velocityWeightsInput;
+	std::vector<CUDAMatrix> velocityWeightsHidden;
+	std::vector<CUDAMatrix> velocityBias;
+	for (int i = 0; i < _inputWeights.size() + 1; i++)
+	{
+		if (i < _inputWeights.size()) velocityWeightsInput.push_back(CUDAMatrix::Zero(_inputWeights[i].GetRows(), _inputWeights[i].GetColumns()));
+		else velocityWeightsInput.push_back(CUDAMatrix::Zero(_weightsOutput.GetRows(), _weightsOutput.GetColumns()));
+	}
+
+	for (int i = 0; i < _hiddenWeights.size(); i++)
+	{
+		velocityWeightsHidden.push_back(CUDAMatrix::Zero(_hiddenWeights[i].GetRows(), _hiddenWeights[i].GetColumns()));
+	}
+
+	for (int i = 0; i < _biasesHidden.size() + 1; i++)
+	{
+		if (i < _biasesHidden.size()) velocityBias.push_back(CUDAMatrix::Zero(_biasesHidden[i].GetRows(), _biasesHidden[i].GetColumns()));
+		else velocityBias.push_back(CUDAMatrix::Zero(_biasesOutput.GetRows(), _biasesOutput.GetColumns()));
+	}
+
 	// Initialize gradients
 	CUDAMatrix outputWeightsGrad = CUDAMatrix::Zero(_weightsOutput.GetRows(), _weightsOutput.GetColumns());
 	CUDAMatrix outputBiasGrad = CUDAMatrix::Zero(_outputNeurons, this->_batchSize);
@@ -685,6 +706,9 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		outputWeightsGrad += outputGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t].back());
 		outputBiasGrad += outputGrad;
 
+		velocityWeightsInput.back() = (velocityWeightsInput.back() * _momentumCoefficient) + (outputWeightsGrad * (1 / _batchSize) * (1 - _momentumCoefficient));
+		velocityBias.back() = (velocityBias.back() * _momentumCoefficient) + (outputBiasGrad.RowAverage() * (1 - _momentumCoefficient));
+
 		// Backpropagate into the hidden layers
 		CUDAMatrix nextLayerGradient;
 		CUDAMatrix hiddenGrad;
@@ -708,8 +732,10 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 			// Accumulate gradients for hidden layer weights and biases
 			if (t > 0) {
 				hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer]);
+				velocityWeightsHidden[layer] = (velocityWeightsHidden[layer] * _momentumCoefficient) + (hiddenWeightsGrad[layer] * (1 / _batchSize) * (1 - _momentumCoefficient));
 			}
 			hiddenBiasGrad[layer] += hiddenGrad;
+			velocityBias[layer] = (velocityBias[layer] * _momentumCoefficient) + (hiddenBiasGrad[layer].RowAverage() * (1 - _momentumCoefficient));
 
 			// Accumulate gradients for input weights
 			if (layer == 0) {
@@ -718,7 +744,7 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 			else if (layer < _hiddenWeights.size() - 1) {
 				inputWeightsGrad[layer] += (hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t][layer - 1])).transpose();
 			}
-
+			velocityWeightsInput[layer] = (velocityWeightsInput[layer] * _momentumCoefficient) + (inputWeightsGrad[layer] * (1 / _batchSize) * (1 - _momentumCoefficient));
 			// Update nextHiddenGrad for the next iteration of layer and timestep
 			nextHiddenGrad[layer] = hiddenGrad;
 			nextLayerGradient = hiddenGrad;
@@ -730,21 +756,20 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 
 	for (int i = 0; i < _inputWeights.size(); i++) {
 		_inputWeights[i] -= inputWeightsGrad[i] * (1.0 / _batchSize) * adjustedLearningRate;
+		//_inputWeights[i] -= velocityWeightsInput[i] * adjustedLearningRate;
 	}
 
 	for (int i = 0; i < _hiddenWeights.size(); i++) {
 		_hiddenWeights[i] -= hiddenWeightsGrad[i] * (1.0 / _batchSize) * adjustedLearningRate;
 		_biasesHidden[i] -= hiddenBiasGrad[i].RowAverage() * adjustedLearningRate;
+		/*_hiddenWeights[i] -= velocityWeightsHidden[i] * adjustedLearningRate;
+		_biasesHidden[i] -= velocityBias[i] * adjustedLearningRate;*/
 	}
 
 	_weightsOutput -= outputWeightsGrad * (1.0 / _batchSize) * adjustedLearningRate;
 	_biasesOutput -= outputBiasGrad.RowAverage() * adjustedLearningRate;
-
-	_batchBiasesOutput -= outputBiasGrad.RowAverageMatrix() * adjustedLearningRate;
-
-	for (int i = 0; i < _batchBiasesHidden.size(); i++) {
-		_batchBiasesHidden[i] -= hiddenBiasGrad[i].RowAverageMatrix() * adjustedLearningRate;
-	}
+	/*_weightsOutput -= velocityWeightsInput.back() * adjustedLearningRate;
+	_biasesOutput -= velocityBias.back() * adjustedLearningRate;*/
 }
 
 std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses) {

@@ -1,8 +1,8 @@
 #include "CUDAMatrix.h"
 
-CUDAMatrix::CUDAMatrix() : _rows(-1), _cols(-1), _underlyingMatrix(nullptr), _arrayForm(false) {}
+CUDAMatrix::CUDAMatrix() : _rows(-1), _cols(-1), _underlyingMatrix(nullptr), _arrayForm(false), _vectorForm(false) {}
 
-CUDAMatrix::CUDAMatrix(int rows, int cols) : _rows(rows), _cols(cols), _underlyingMatrix(new double[rows * cols]), _arrayForm(false) {
+CUDAMatrix::CUDAMatrix(int rows, int cols) : _rows(rows), _cols(cols), _underlyingMatrix(new double[rows * cols]), _arrayForm(false), _vectorForm(false) {
 
 }
 
@@ -18,7 +18,7 @@ CUDAMatrix::~CUDAMatrix() {
 //}
 
 CUDAMatrix::CUDAMatrix(const CUDAMatrix& other)
-	: _rows(other._rows), _cols(other._cols), _underlyingMatrix(new double[other._rows * other._cols]), _arrayForm(other._arrayForm) {
+	: _rows(other._rows), _cols(other._cols), _underlyingMatrix(new double[other._rows * other._cols]), _arrayForm(other._arrayForm), _vectorForm(other._vectorForm) {
 	std::copy(other._underlyingMatrix, other._underlyingMatrix + other._rows * other._cols, _underlyingMatrix);
 }
 
@@ -35,6 +35,7 @@ CUDAMatrix& CUDAMatrix::operator=(CUDAMatrix inputMatrix) {
 	if(this == &inputMatrix) return *this;
 
 	this->_arrayForm = false;
+	this->_vectorForm = false;
 	this->_cols = inputMatrix.GetColumns();
 	this->_rows = inputMatrix.GetRows();
 
@@ -76,6 +77,14 @@ CUDAMatrix CUDAMatrix::Zero(int rows, int columns) {
 CUDAMatrix CUDAMatrix::Array() {
 	CUDAMatrix res = *this;
 	res._arrayForm = true;
+	res._vectorForm = false;
+	return res;
+}
+
+CUDAMatrix CUDAMatrix::Vec() {
+	CUDAMatrix res = *this;
+	res._arrayForm = false;
+	res._vectorForm = true;
 	return res;
 }
 

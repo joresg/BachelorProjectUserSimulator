@@ -21,6 +21,17 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector};
 
 #pragma region CUDA kernels
+// Kernel to add a column vector to each column of a matrix
+__global__ void addColumnVectorToMatrix(double* matrix, double* vector, double* result, int m, int n) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+    // Check if the thread is within the bounds of the matrix
+    if (row < m && col < n) {
+        result[row * n + col] = matrix[row * n + col] + vector[row];
+    }
+}
+
 // row average and set every element of that row to this value
 __global__ void setRowAverage(double* matrix, int M, int N) {
     int row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -124,6 +135,36 @@ __global__ void addVecKernel(double* c, const double* a, const double* b)
 #pragma endregion
 
 #pragma region kernel calls
+void AddMatrixAndColumnVec(double* matrix, double* vector, double* res, int m, int n) {
+
+    // Device matrices
+    double* d_matrix, * d_vector, * d_result;
+
+    // Allocate device memory
+    cudaMalloc(&d_matrix, m * n * sizeof(double));
+    cudaMalloc(&d_vector, m * sizeof(double));
+    cudaMalloc(&d_result, m * n * sizeof(double));
+
+    // Copy data from host to device
+    cudaMemcpy(d_matrix, matrix, m * n * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vector, vector, m * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Define grid and block sizes
+    dim3 blockSize(16, 16);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (m + blockSize.y - 1) / blockSize.y);
+
+    // Launch the kernel
+    addColumnVectorToMatrix << <gridSize, blockSize >> > (d_matrix, d_vector, d_result, m, n);
+
+    // Copy result from device to host
+    cudaMemcpy(res, d_result, m * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_matrix);
+    cudaFree(d_vector);
+    cudaFree(d_result);
+}
+
 CUDAMatrix MatrixFromRowAverage(CUDAMatrix* mat) {
 
     int rows = mat->GetRows();
@@ -379,15 +420,28 @@ CUDAMatrix MathHandler::TransposeMatrix(CUDAMatrix inputMatrix) {
 
 #pragma region operator overloads
 CUDAMatrix& CUDAMatrix::operator+=(const CUDAMatrix& mat2) {
-    if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) {
+    /*if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) {
         throw std::invalid_argument("matrix addition dimensions incorrect!");
+    }*/
+    if (!this->_arrayForm && !this->_vectorForm && mat2._vectorForm && this->GetRows() != mat2.GetRows()) {
+        throw std::invalid_argument("matrix addition by row vector dimensions incorrect!");
     }
+    else if (!this->_arrayForm && !this->_vectorForm && !mat2._arrayForm && !mat2._vectorForm && this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix addition dimensions incorrect!");
+
     this->_arrayForm = false;
     MatrixOperation op = Add;
-    double* res = new double[this->GetRows() * mat2.GetColumns()];
-    matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+    double* res = new double[this->GetRows() * this->GetColumns()];
+    //matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+    if (!this->_arrayForm && !this->_vectorForm && mat2._vectorForm) {
+        AddMatrixAndColumnVec(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), this->GetColumns());
+    }
+    else {
+        matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+    }
     this->SetUnderlyingMatrix(res);
     return *this;
+
+    //return *this + mat2;
 }
 
 CUDAMatrix CUDAMatrix::operator-=(CUDAMatrix mat2) {
@@ -412,17 +466,29 @@ CUDAMatrix CUDAMatrix::operator-(CUDAMatrix mat2) {
 }
 
 CUDAMatrix CUDAMatrix::operator+(CUDAMatrix mat2) {
-    if (this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix multiplication dimensions incorrect!");
+    if (!this->_arrayForm && !this->_vectorForm && mat2._vectorForm && this->GetRows() != mat2.GetRows()) {
+        throw std::invalid_argument("matrix addition by row vector dimensions incorrect!");
+    }
+    else if (!this->_arrayForm && !this->_vectorForm && !mat2._arrayForm && !mat2._vectorForm && this->GetColumns() != mat2.GetColumns() || this->GetRows() != mat2.GetRows()) throw std::invalid_argument("matrix addition dimensions incorrect!");
 
     MatrixOperation op = Add;
-    double* res = new double[this->GetRows() * mat2.GetColumns()];
-    matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
-    CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
+    double* res = new double[this->GetRows() * this->GetColumns()];
+    if (!this->_arrayForm && !this->_vectorForm && mat2._vectorForm) {
+        AddMatrixAndColumnVec(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), this->GetColumns());
+    }
+    else {
+        matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), res, this->GetRows(), mat2.GetColumns(), op);
+    }
+    CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
     resMatrix.SetUnderlyingMatrix(res);
     return resMatrix;
 }
 
 CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
+    if (this->_arrayForm && mat2._arrayForm && this->GetRows() != mat2.GetRows() && this->GetColumns() != mat2.GetColumns()) {
+        throw std::invalid_argument("matrix multiplication in array form dimensions incorrect!");
+    }
+
     if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) {
         throw std::invalid_argument("matrix multiplication dimensions incorrect!");
     }

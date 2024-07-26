@@ -44,7 +44,7 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 
 	hiddenNeuronsCombination23.push_back(hiddenNuronsCount1);
 
-	hiddenNeuronsCombination23.push_back(hiddenNuronsCount3);
+	hiddenNeuronsCombination24.push_back(hiddenNuronsCount3);
 
 	hiddenNeuronsCombination21.push_back(hiddenNuronsCount2);
 

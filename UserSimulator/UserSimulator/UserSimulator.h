@@ -25,12 +25,8 @@ public:
 		_weightsOutput.Print();
 		printf("_biasesHidden\n");
 		//_biasesHidden.Print();
-		printf("_batchBiasesHidden\n");
-		//_batchBiasesHidden.Print();
 		printf("_biasesOutput\n");
 		_biasesOutput.Print();
-		printf("_batchBiasesOutput\n");
-		_batchBiasesOutput.Print();
 	}
 	void CopyParameters();
 	void RestoreBestParameters();
@@ -47,9 +43,7 @@ private:
 	std::vector<CUDAMatrix> _hiddenWeights;
 	CUDAMatrix _weightsOutput;
 	std::vector<CUDAMatrix> _biasesHidden;
-	std::vector<CUDAMatrix> _batchBiasesHidden;
 	CUDAMatrix _biasesOutput;
-	CUDAMatrix _batchBiasesOutput;
 
 	std::vector<CUDAMatrix> _inputWeightsCopy;
 	std::vector<CUDAMatrix> _hiddenWeightsCopy;
@@ -74,6 +68,7 @@ private:
 	int _allClasses;
 	double _modelAccuracy;
 	int _trainingSeqLength;
+	double _momentumCoefficient;
 
 	std::vector<std::vector<int>> _validationSet;
 };
