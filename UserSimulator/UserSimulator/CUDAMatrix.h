@@ -2,6 +2,12 @@
 #include <stdexcept>
 
 #pragma once
+enum LayerActivationFuncs {
+	reluAct,
+	tanhAct,
+	sigAct
+};
+
 class CUDAMatrix
 {
 private:
@@ -17,6 +23,7 @@ public:
 	~CUDAMatrix();
 	CUDAMatrix(const CUDAMatrix& other);
 
+	CUDAMatrix Activate(LayerActivationFuncs fn);
 	CUDAMatrix tanh();
 	CUDAMatrix exp();
 	CUDAMatrix transpose();

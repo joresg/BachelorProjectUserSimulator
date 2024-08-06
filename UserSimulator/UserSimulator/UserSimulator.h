@@ -4,7 +4,7 @@
 class UserSimulator
 {
 public:
-	UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
+	UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
 	double EvaluateOnValidateSet();
 	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses = 1);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
@@ -64,6 +64,7 @@ private:
 
 	int _inputNeurons;
 	std::vector<int> _hiddenLayerNeurons;
+	std::vector<LayerActivationFuncs> _hiddenLayerNeuronsActivationFuncs;
 	int _outputNeurons;
 	double _learningRate;
 	int _batchSize;

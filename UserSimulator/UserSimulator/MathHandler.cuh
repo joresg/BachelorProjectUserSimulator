@@ -17,7 +17,8 @@ public:
 	MathHandler(unsigned long randomSeed);
 	CUDAMatrix TransposeMatrix(CUDAMatrix inputMatrix);
 	double GenerateRandomNumber(double min, double max);
-	CUDAMatrix TanhDerivative(CUDAMatrix inputMatrix);
+	//CUDAMatrix TanhDerivative(CUDAMatrix inputMatrix);
+	CUDAMatrix ActFuncDerivative(CUDAMatrix inputMatrix, LayerActivationFuncs actFunc);
 	std::default_random_engine GetRandomEngine() { return _re; }
 	std::vector<CUDAMatrix> CreateOneHotEncodedVector(std::vector<int> cmdIDs, int allClasses);
 	std::vector<CUDAMatrix> CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, int allClasses, int batchSize);

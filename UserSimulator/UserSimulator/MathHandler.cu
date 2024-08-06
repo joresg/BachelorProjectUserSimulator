@@ -18,7 +18,7 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 
 }
 
-enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector};
+enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, None};
 
 #pragma region CUDA kernels
 // Kernel to add a column vector to each column of a matrix
@@ -45,13 +45,14 @@ __global__ void rowAverage(const double* matrix, double* rowAvg, int M, int N) {
 }
 
 // CUDA kernel to apply tanh to each element of the matrix
-__global__ void tanhKernel(double* d_matrix, int width, int height) {
+__global__ void actFuncKernel(double* d_matrix, int width, int height, LayerActivationFuncs fn) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     if (x < width && y < height) {
         int idx = y * width + x;
-        d_matrix[idx] = tanh(d_matrix[idx]);
+        if (fn == tanhAct) d_matrix[idx] = tanh(d_matrix[idx]);
+        else if (fn == reluAct) d_matrix[idx] = fmax(0.0, d_matrix[idx]);
     }
 }
 
@@ -108,6 +109,7 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
         else if (op == SubstractInvert) C[index] = -(A[index] - constValue);
         else if (op == SquaredSubstractInvert) C[index] = -(pow(A[index], 2) - constValue);
         else if (op == Exp) C[index] = std::exp(A[index]);
+        else if (op == ReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.0;
     }
 }
 
@@ -186,7 +188,7 @@ CUDAMatrix RowVectorFromRowAverage(CUDAMatrix* mat) {
     return resVector;
 }
 
-CUDAMatrix applyTanhToMatrix(CUDAMatrix* inputMatrix) {
+CUDAMatrix applyActFuncToMatrix(CUDAMatrix* inputMatrix, LayerActivationFuncs fn) {
 
     CUDAMatrix resMatrix = *inputMatrix;
 
@@ -204,7 +206,7 @@ CUDAMatrix applyTanhToMatrix(CUDAMatrix* inputMatrix) {
     dim3 gridSize((resMatrix.GetColumns() + blockSize.x - 1) / blockSize.x, (resMatrix.GetRows() + blockSize.y - 1) / blockSize.y);
 
     // Launch the kernel
-    tanhKernel << <gridSize, blockSize >> > (d_matrix, resMatrix.GetColumns(), resMatrix.GetRows());
+    actFuncKernel << <gridSize, blockSize >> > (d_matrix, resMatrix.GetColumns(), resMatrix.GetRows(), fn);
     CHECK_CUDA_ERROR(cudaGetLastError());
 
     // Copy the result back to host
@@ -344,8 +346,13 @@ CUDAMatrix applyExpToMatrix(CUDAMatrix* inputMatrix) {
 #pragma endregion
 
 #pragma region public calls
+CUDAMatrix CUDAMatrix::Activate(LayerActivationFuncs fn) {
+    return applyActFuncToMatrix(this, fn);
+}
+
 CUDAMatrix CUDAMatrix::tanh() {
-    return applyTanhToMatrix(this);
+    LayerActivationFuncs actFn = tanhAct;
+    return applyActFuncToMatrix(this, actFn);
 }
 
 CUDAMatrix CUDAMatrix::exp() {
@@ -504,8 +511,13 @@ double MathHandler::GenerateRandomNumber(double lowerBound, double upperBound) {
     return unif(_re);
 }
 
-CUDAMatrix MathHandler::TanhDerivative(CUDAMatrix inputMatrix) {
-    MatrixOperation op = SquaredSubstractInvert;
+CUDAMatrix MathHandler::ActFuncDerivative(CUDAMatrix inputMatrix, LayerActivationFuncs actFunc) {
+    MatrixOperation op = None;
+    if (actFunc == tanhAct) op = SquaredSubstractInvert;
+    else if (actFunc == reluAct) op = ReLUDerivative;
+
+    if(op == None) throw std::invalid_argument("data for act func derivative not correct!");
+
     double* matRes = new double[inputMatrix.GetRows() * inputMatrix.GetColumns()];
     matrixElementWiseOperations(inputMatrix.GetUnderlyingMatrix(), 1, matRes, inputMatrix.GetRows(), inputMatrix.GetColumns(), op);
     CUDAMatrix resMatrix(inputMatrix.GetRows(), inputMatrix.GetColumns());

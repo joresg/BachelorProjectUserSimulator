@@ -129,9 +129,9 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 
 	(mat1 * mat2).Print();
 
-	CUDAMatrix tanhDer = userSimulator->GetMathEngine()->TanhDerivative(mat1);
-	printf("tanhder\n");
-	tanhDer.Print();
+	//CUDAMatrix tanhDer = userSimulator->GetMathEngine()->TanhDerivative(mat1);
+	//printf("tanhder\n");
+	//tanhDer.Print();
 
 	//mat1.Print();
 
@@ -185,7 +185,10 @@ int main() {
 	std::vector<std::vector<int>> allSequencesFromFile;
 	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
 
-	std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)");
+	//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\YWDClickSeq.txt)";
+	const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
+	//std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)");
+	std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(filePath);
 
 	int allClasses = commandIDsMap.size();
 	int inputNeurons = allClasses;
@@ -198,7 +201,8 @@ int main() {
 
 		cudaDeviceReset();
 
-		readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)", true, std::get<2>(paramCombo));
+		//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)", true, std::get<2>(paramCombo));
+		readFileRes = fileManager->ReadTXTFile(filePath, true, std::get<2>(paramCombo));
 		allSequencesFromFile = std::get<0>(readFileRes);
 
 		// split into training and validation set
@@ -231,9 +235,20 @@ int main() {
 		double desiredAcc = 0.9;
 		int progress = 1;
 
-		std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string(),
-			[](const std::string& a, int b) {
-				return a.empty() ? std::to_string(b) : a + "," + std::to_string(b);
+		std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string{},
+			[](const std::string& acc, const std::tuple<int, LayerActivationFuncs>& elem) {
+				int num = std::get<0>(elem);
+				const LayerActivationFuncs& obj = std::get<1>(elem);
+				std::stringstream ss;
+				ss << acc;
+				if (!acc.empty()) {
+					ss << ", ";
+				}
+				int pos = static_cast<LayerActivationFuncs>(obj);
+				//ss << num << ":" << obj;
+				ss << num << ":" << (pos == 0 ? "relu" : "tanh");
+
+				return ss.str();
 			});
 
 		printf("learning rate: %f, allClasses: %d, hidden units: {%s}, seq length: %d, batch size: %d\n", std::get<0>(paramCombo), allClasses, hiddenNeuronsString.c_str(), std::get<2>(paramCombo), std::get<3>(paramCombo));
@@ -272,10 +287,11 @@ int main() {
 			{
 				double currentAcc = userSimulator->EvaluateOnValidateSet();
 				if (currentAcc >= desiredAcc) {
+					maxAccAchieved = currentAcc;
 					printf("%f accuarcy reached...\n", desiredAcc);
 					break;
 				}
-				else if (currentAcc < maxAccAchieved + 0.01 && currentEpoch - maxAccEpoch >= 4) {
+				else if (currentAcc < maxAccAchieved + 0.01 && currentEpoch - maxAccEpoch >= 2) {
 					printf("learning converged....\n");
 					userSimulator->RestoreBestParameters();
 					break;
@@ -285,7 +301,7 @@ int main() {
 					maxAccEpoch = currentEpoch;
 					userSimulator->CopyParameters();
 				}
-				else if (currentAcc < maxAccAchieved - 0.10 || currentAcc < 0.05) {
+				else if (currentAcc < maxAccAchieved - 0.06 || currentAcc < 0.05) {
 					printf("model deteriorated too much stopping training\n");
 					userSimulator->RestoreBestParameters();
 					break;
@@ -298,6 +314,8 @@ int main() {
 		userSimulator->SetModelAccOnValidationData(maxAccAchieved);
 
 		if (bestModel == nullptr || maxAccAchieved > bestModel->GetModelACcOnValidationData()) bestModel = userSimulator;
+
+		if (maxAccAchieved >= 0.99) break;
 	}
 
 	printf("FINISHED TRAINING\n");
@@ -409,30 +427,44 @@ int main() {
 	return 0;
 }
 
-UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : _weightsOutput(outputNeurons, 
-	hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]), _biasesOutput(outputNeurons, 1), _batchSize(batchSize), _allTrainingExamplesCount(-1) {
+UserSimulator::UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : 
+	_weightsOutput(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1])), _biasesOutput(outputNeurons, 1), _batchSize(batchSize), _allTrainingExamplesCount(-1) {
 
 	// on stack or heap, memory should be managed either way through destructor...
 	bool firstHiddenLayer = true;
 	int prevHlc = 0;
-	for (int i : hiddenLayerNeurons) {
+	for (const auto& i : hiddenLayerNeurons) {
 		if (firstHiddenLayer) {
-			_inputWeights.push_back(CUDAMatrix(i, inputNeurons));
+			_inputWeights.push_back(CUDAMatrix(std::get<0>(i), inputNeurons));
 			firstHiddenLayer = false;
 		}
 		else {
-			_inputWeights.push_back(CUDAMatrix(hiddenLayerNeurons[prevHlc], i));
+			_inputWeights.push_back(CUDAMatrix(std::get<0>(hiddenLayerNeurons[prevHlc]), std::get<0>(i)));
 			prevHlc++;
 		}
-		_hiddenWeights.push_back(CUDAMatrix(i, i));
-		_biasesHidden.push_back(CUDAMatrix(i, 1));
+		_hiddenWeights.push_back(CUDAMatrix(std::get<0>(i), std::get<0>(i)));
+		_biasesHidden.push_back(CUDAMatrix(std::get<0>(i), 1));
 	}
 
 	_momentumCoefficient = 0.9;
 
 	_learningRate = learningRate;
 	_inputNeurons = inputNeurons;
-	_hiddenLayerNeurons = hiddenLayerNeurons;
+
+	std::vector<int> hLayerN;
+	std::vector<LayerActivationFuncs> hLayerActFuncs;
+	for (const auto& tup : hiddenLayerNeurons) {
+		int hln = std::get<0>(tup);
+		LayerActivationFuncs hlaf = std::get<1>(tup);
+
+		hLayerN.push_back(hln);
+		hLayerActFuncs.push_back(hlaf);
+	}
+
+	/*_hiddenLayerNeurons = hiddenLayerNeurons;
+	_hiddenLayerNeuronsActivationFuncs = hiddenLayerNeuronsActivationFuncs;*/
+	_hiddenLayerNeurons = hLayerN;
+	_hiddenLayerNeuronsActivationFuncs = hLayerActFuncs;
 	_outputNeurons = outputNeurons;
 	_allClasses = outputNeurons;
 	_totalLoss = 0; 
@@ -489,7 +521,7 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<int> hiddenLayerNeuro
 	// biases for hidden layer
 	//_biasesHidden.Resize(hiddenLayerNeurons, 1);
 	for (int hbc = 0; hbc < hiddenLayerNeurons.size(); hbc++) {
-		for (int i = 0; i < hiddenLayerNeurons[hbc]; i++) {
+		for (int i = 0; i < std::get<0>(hiddenLayerNeurons[hbc]); i++) {
 			double randomBias = unif(re) / 5 - 0.1;
 			//_biasesHidden(i, 0) = unif(re) / 5 - 0.1;
 			_biasesHidden[hbc](i, 0) = randomBias;
@@ -590,7 +622,8 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 
 		XHCurrentTimeStep += _biasesHidden[l].Vec();
 
-		activatedHiddenLayer = XHCurrentTimeStep.tanh();
+		//activatedHiddenLayer = XHCurrentTimeStep.tanh();
+		activatedHiddenLayer = XHCurrentTimeStep.Activate(_hiddenLayerNeuronsActivationFuncs[l]);
 		allHiddenLayers.push_back(activatedHiddenLayer);
 	}
 
@@ -696,7 +729,7 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		for (int layer = _hiddenWeights.size() - 1; layer >= 0; layer--) {
 			//CUDAMatrix hiddenGrad;
 			if (layer == _hiddenWeights.size() - 1) {
-				hiddenGrad = (_weightsOutput.transpose() * outputGrad).Array() * _mathHandler->TanhDerivative(_hiddenStepValues[t][layer]).Array();
+				hiddenGrad = (_weightsOutput.transpose() * outputGrad).Array() * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]).Array();
 			}
 			else {
 				if (t < _outputValues.size() - 1)
@@ -707,7 +740,7 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 					hiddenGrad = _inputWeights[layer + 1] * nextLayerGradient + _hiddenWeights[layer].transpose() * nextHiddenGrad[layer];
 				}
 
-				hiddenGrad = hiddenGrad.Array() * _mathHandler->TanhDerivative(_hiddenStepValues[t][layer]);
+				hiddenGrad = hiddenGrad.Array() * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]);
 			}
 
 			// Accumulate gradients for hidden layer weights and biases
@@ -823,7 +856,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 		}
 		else {
 			CUDAMatrix lastTimeStep = _outputValues[_outputValues.size() - 1];
-			for (int i = 0; i < selectNTopClasses; i++) {
+			for (int i = 0; i < std::min(selectNTopClasses, allClasses); i++) {
 				topNIDs.push_front(std::make_tuple(i, lastTimeStep(i, 0)));
 			}
 			std::sort(topNIDs.begin(), topNIDs.end(), [](const auto& a, const auto& b) {
