@@ -3,13 +3,11 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses) {
-	//_learningRate.push_back(0.01);
+	_learningRate.push_back(0.01);
 	_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
 	_learningRate.push_back(0.00001);
 	_learningRate.push_back(0.000001);
-	_learningRate.push_back(0.0000001);
-	_learningRate.push_back(0.00000001);
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination1;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination2;
@@ -29,22 +27,23 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 
 	LayerActivationFuncs reluA = reluAct;
 	LayerActivationFuncs tanhA = tanhAct;
+	LayerActivationFuncs leakyReLUA = leakyReLU;
 
-	hiddenNeuronsCombination4.push_back(std::make_tuple(hiddenNuronsCount1, reluA));
+	hiddenNeuronsCombination4.push_back(std::make_tuple(hiddenNuronsCount1, leakyReLUA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination2.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
-	hiddenNeuronsCombination5.push_back(std::make_tuple(hiddenNuronsCount2, reluA));
+	hiddenNeuronsCombination5.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
 	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
 	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
-	hiddenNeuronsCombination6.push_back(std::make_tuple(hiddenNuronsCount2, reluA));
-	hiddenNeuronsCombination6.push_back(std::make_tuple(hiddenNuronsCount1, reluA));
+	hiddenNeuronsCombination6.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
+	hiddenNeuronsCombination6.push_back(std::make_tuple(hiddenNuronsCount1, leakyReLUA));
 	hiddenNeuronsCombination7.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
-	hiddenNeuronsCombination7.push_back(std::make_tuple(hiddenNuronsCount1, reluA));
-	hiddenNeuronsCombination8.push_back(std::make_tuple(hiddenNuronsCount2, reluA));
+	hiddenNeuronsCombination7.push_back(std::make_tuple(hiddenNuronsCount1, leakyReLUA));
+	hiddenNeuronsCombination8.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
 	hiddenNeuronsCombination8.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 
-	_hiddenUnits.push_back(hiddenNeuronsCombination4);
 	_hiddenUnits.push_back(hiddenNeuronsCombination1);
+	_hiddenUnits.push_back(hiddenNeuronsCombination4);
 	_hiddenUnits.push_back(hiddenNeuronsCombination2);
 	_hiddenUnits.push_back(hiddenNeuronsCombination5);
 	_hiddenUnits.push_back(hiddenNeuronsCombination3);
@@ -52,7 +51,7 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 	_hiddenUnits.push_back(hiddenNeuronsCombination7);
 	_hiddenUnits.push_back(hiddenNeuronsCombination8);
 
-	_sequenceLength.push_back(10);
+	//_sequenceLength.push_back(10);
 	//_sequenceLength.push_back(15);
 	_sequenceLength.push_back(20);
 	//_sequenceLength.push_back(25);

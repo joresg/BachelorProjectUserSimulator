@@ -74,6 +74,12 @@ CUDAMatrix CUDAMatrix::Zero(int rows, int columns) {
 	return newMatrix;
 }
 
+CUDAMatrix CUDAMatrix::One(int rows, int columns) {
+	CUDAMatrix newMatrix(rows, columns);
+	std::fill(newMatrix._underlyingMatrix, newMatrix._underlyingMatrix + rows * columns, 1.0);
+	return newMatrix;
+}
+
 CUDAMatrix CUDAMatrix::Array() {
 	CUDAMatrix res = *this;
 	res._arrayForm = true;

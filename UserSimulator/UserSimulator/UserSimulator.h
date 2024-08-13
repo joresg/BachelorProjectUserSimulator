@@ -9,6 +9,8 @@ public:
 	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses = 1);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
 	void BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
+	void ForwardPropGated(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
+	void BackPropGated(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
 	MathHandler* GetMathEngine() { return _mathHandler; }
 	void PrintPredictedClassProbabilities();
 	int GetBatchSize() { return _batchSize; }
@@ -50,6 +52,16 @@ private:
 	std::vector<CUDAMatrix> _velocityWeightsHidden;
 	std::vector<CUDAMatrix> _velocityBias;
 
+	std::vector<CUDAMatrix> _updateGateInput;
+	std::vector<CUDAMatrix> _updateGateHidden;
+	std::vector<CUDAMatrix> _updateGateBias;
+	std::vector<CUDAMatrix> _resetGateInput;
+	std::vector<CUDAMatrix> _resetGateHidden;
+	std::vector<CUDAMatrix> _resetGateBias;
+	std::vector<CUDAMatrix> _candidateActivationInput;
+	std::vector<CUDAMatrix> _candidateActivationHidden;
+	std::vector<CUDAMatrix> _candidateActivationBias;
+
 	std::vector<CUDAMatrix> _inputWeightsCopy;
 	std::vector<CUDAMatrix> _hiddenWeightsCopy;
 	CUDAMatrix _weightsOutputCopy;
@@ -57,6 +69,9 @@ private:
 	CUDAMatrix _biasesOutputCopy;
 
 	std::vector<std::vector<CUDAMatrix>> _hiddenStepValues;
+	std::vector<std::vector<CUDAMatrix>> _resetGateValues;
+	std::vector<std::vector<CUDAMatrix>> _updateGateValues;
+	std::vector<std::vector<CUDAMatrix>> _candidateActivationValues;
 	std::vector<CUDAMatrix> _outputValues;
 	std::vector<CUDAMatrix> _oneHotEncodedClicks;
 

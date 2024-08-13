@@ -18,7 +18,7 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 
 }
 
-enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, None};
+enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, LeakyReLUDerivative, SigmoidDerivative, None};
 
 #pragma region CUDA kernels
 // Kernel to add a column vector to each column of a matrix
@@ -53,6 +53,8 @@ __global__ void actFuncKernel(double* d_matrix, int width, int height, LayerActi
         int idx = y * width + x;
         if (fn == tanhAct) d_matrix[idx] = tanh(d_matrix[idx]);
         else if (fn == reluAct) d_matrix[idx] = fmax(0.0, d_matrix[idx]);
+        else if (fn == leakyReLU) d_matrix[idx] = d_matrix[idx] > 0 ? d_matrix[idx] : 0.01 * d_matrix[idx];
+        else if (fn == sigAct) d_matrix[idx] = 1 / (1 + exp(-d_matrix[idx]));
     }
 }
 
@@ -110,6 +112,11 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
         else if (op == SquaredSubstractInvert) C[index] = -(pow(A[index], 2) - constValue);
         else if (op == Exp) C[index] = std::exp(A[index]);
         else if (op == ReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.0;
+        else if (op == LeakyReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.01;
+        else if (op == SigmoidDerivative) {
+            double sigmoid = 1.0 / (1.0 + exp(-A[index]));
+            C[index] = sigmoid * (1.0 - sigmoid);
+        }
     }
 }
 
@@ -355,6 +362,11 @@ CUDAMatrix CUDAMatrix::tanh() {
     return applyActFuncToMatrix(this, actFn);
 }
 
+CUDAMatrix CUDAMatrix::sigmoid() {
+    LayerActivationFuncs actFn = sigAct;
+    return applyActFuncToMatrix(this, actFn);
+}
+
 CUDAMatrix CUDAMatrix::exp() {
     return applyExpToMatrix(this);
 }
@@ -495,6 +507,24 @@ CUDAMatrix CUDAMatrix::operator*(double constValue) {
     return resMatrix;
 }
 
+CUDAMatrix CUDAMatrix::operator+(double constValue) {
+    MatrixOperation op = Add;
+    double* matRes = new double[this->GetRows() * this->GetColumns()];
+    matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
+    CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+}
+
+CUDAMatrix CUDAMatrix::operator-(double constValue) {
+    MatrixOperation op = Substract;
+    double* matRes = new double[this->GetRows() * this->GetColumns()];
+    matrixElementWiseOperations(this->GetUnderlyingMatrix(), constValue, matRes, this->GetRows(), this->GetColumns(), op);
+    CUDAMatrix resMatrix(this->GetRows(), this->GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+}
+
 CUDAMatrix CUDAMatrix::operator/(double constValue) {
     MatrixOperation op = DivideExp;
     double* matRes = new double[this->GetRows() * this->GetColumns()];
@@ -515,6 +545,8 @@ CUDAMatrix MathHandler::ActFuncDerivative(CUDAMatrix inputMatrix, LayerActivatio
     MatrixOperation op = None;
     if (actFunc == tanhAct) op = SquaredSubstractInvert;
     else if (actFunc == reluAct) op = ReLUDerivative;
+    else if (actFunc == leakyReLU) op = LeakyReLUDerivative;
+    else if (actFunc == sigAct) op = SigmoidDerivative;
 
     if(op == None) throw std::invalid_argument("data for act func derivative not correct!");
 

@@ -5,7 +5,8 @@
 enum LayerActivationFuncs {
 	reluAct,
 	tanhAct,
-	sigAct
+	sigAct,
+	leakyReLU
 };
 
 class CUDAMatrix
@@ -25,6 +26,7 @@ public:
 
 	CUDAMatrix Activate(LayerActivationFuncs fn);
 	CUDAMatrix tanh();
+	CUDAMatrix sigmoid();
 	CUDAMatrix exp();
 	CUDAMatrix transpose();
 	CUDAMatrix RowAverage();
@@ -40,6 +42,7 @@ public:
 	}
 	void Resize(int rows, int columns);
 	static CUDAMatrix Zero(int rows, int columns);
+	static CUDAMatrix One(int rows, int columns);
 	CUDAMatrix Array();
 	CUDAMatrix Vec();
 	void Destroy();
@@ -49,6 +52,8 @@ public:
 	double& operator()(int row, int col);
 	CUDAMatrix operator-(CUDAMatrix mat2);
 	CUDAMatrix operator+(CUDAMatrix mat2);
+	CUDAMatrix operator+(double constValue);
+	CUDAMatrix operator-(double constValue);
 	CUDAMatrix operator*(const CUDAMatrix& mat2) const;
 	CUDAMatrix operator*(double constValue);
 	CUDAMatrix operator/(double constValue);
