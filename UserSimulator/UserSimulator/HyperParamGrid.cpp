@@ -2,12 +2,12 @@
 #include <tuple>
 
 
-HyperParamGrid::HyperParamGrid(int allClasses) {
+HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
+	//_learningRate.push_back(0.1);
 	_learningRate.push_back(0.01);
 	_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
 	_learningRate.push_back(0.00001);
-	_learningRate.push_back(0.000001);
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination1;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination2;
@@ -17,8 +17,13 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination5;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination6;
 
-	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination7;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination8;
+
+	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination9;
+	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination10;
+
+	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination11;
+	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination12;
 
 
 	int hiddenNuronsCount1 = allClasses / 2;
@@ -37,28 +42,60 @@ HyperParamGrid::HyperParamGrid(int allClasses) {
 	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination6.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
 	hiddenNeuronsCombination6.push_back(std::make_tuple(hiddenNuronsCount1, leakyReLUA));
-	hiddenNeuronsCombination7.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
-	hiddenNeuronsCombination7.push_back(std::make_tuple(hiddenNuronsCount1, leakyReLUA));
 	hiddenNeuronsCombination8.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
 	hiddenNeuronsCombination8.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination9.push_back(std::make_tuple(hiddenNuronsCount3, leakyReLUA));
+	hiddenNeuronsCombination9.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
+	hiddenNeuronsCombination10.push_back(std::make_tuple(hiddenNuronsCount3, tanhA));
 
-	_hiddenUnits.push_back(hiddenNeuronsCombination1);
-	_hiddenUnits.push_back(hiddenNeuronsCombination4);
-	_hiddenUnits.push_back(hiddenNeuronsCombination2);
-	_hiddenUnits.push_back(hiddenNeuronsCombination5);
-	_hiddenUnits.push_back(hiddenNeuronsCombination3);
-	_hiddenUnits.push_back(hiddenNeuronsCombination6);
-	_hiddenUnits.push_back(hiddenNeuronsCombination7);
-	_hiddenUnits.push_back(hiddenNeuronsCombination8);
+	hiddenNeuronsCombination11.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
+	hiddenNeuronsCombination11.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
 
-	//_sequenceLength.push_back(10);
-	//_sequenceLength.push_back(15);
-	_sequenceLength.push_back(20);
-	//_sequenceLength.push_back(25);
-	_sequenceLength.push_back(30);
+	hiddenNeuronsCombination12.push_back(std::make_tuple(hiddenNuronsCount3, leakyReLUA));
+	hiddenNeuronsCombination12.push_back(std::make_tuple(hiddenNuronsCount3, tanhA));
+
+	//_hiddenUnits.push_back(hiddenNeuronsCombination10);
+
+	if (gatedCells == NoGates)
+	{
+		_hiddenUnits.push_back(hiddenNeuronsCombination1);
+		_hiddenUnits.push_back(hiddenNeuronsCombination2);
+		_hiddenUnits.push_back(hiddenNeuronsCombination10);
+
+		/*_hiddenUnits.push_back(hiddenNeuronsCombination1);
+		_hiddenUnits.push_back(hiddenNeuronsCombination4);
+		_hiddenUnits.push_back(hiddenNeuronsCombination2);
+		_hiddenUnits.push_back(hiddenNeuronsCombination5);
+		_hiddenUnits.push_back(hiddenNeuronsCombination3);
+		_hiddenUnits.push_back(hiddenNeuronsCombination6);
+		_hiddenUnits.push_back(hiddenNeuronsCombination8);
+		_hiddenUnits.push_back(hiddenNeuronsCombination9);
+		_hiddenUnits.push_back(hiddenNeuronsCombination10);*/
+
+		_sequenceLength.push_back(5);
+		_sequenceLength.push_back(10);
+		_sequenceLength.push_back(15);
+		_sequenceLength.push_back(20);
+		_sequenceLength.push_back(25);
+		_sequenceLength.push_back(30);
+	}
+	else {
+		_hiddenUnits.push_back(hiddenNeuronsCombination1);
+		_hiddenUnits.push_back(hiddenNeuronsCombination2);
+		_hiddenUnits.push_back(hiddenNeuronsCombination9);
+		_hiddenUnits.push_back(hiddenNeuronsCombination10);
+
+
+		_sequenceLength.push_back(20);
+		_sequenceLength.push_back(50);
+		_sequenceLength.push_back(100);
+	}
+
 
 	_batchSize.push_back(8);
 	_batchSize.push_back(16);
+	_batchSize.push_back(32);
+	_batchSize.push_back(128);
 }
 
 std::vector<std::tuple<double, std::vector<std::tuple<int, LayerActivationFuncs>>, int, int>> HyperParamGrid::HyperParameterGridSearch() {

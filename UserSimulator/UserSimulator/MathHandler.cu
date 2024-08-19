@@ -452,7 +452,7 @@ CUDAMatrix CUDAMatrix::operator+(CUDAMatrix mat2) {
 }
 
 CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
-    if (this->_arrayForm && mat2._arrayForm && this->GetRows() != mat2.GetRows() && this->GetColumns() != mat2.GetColumns()) {
+    if ((this->_arrayForm || mat2._arrayForm) && this->GetRows() != mat2.GetRows() && this->GetColumns() != mat2.GetColumns()) {
         throw std::invalid_argument("matrix multiplication in array form dimensions incorrect!");
     }
 
@@ -463,7 +463,7 @@ CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
     MatrixOperation op = Multiply;
     double* matRes = new double[this->GetRows() * mat2.GetColumns()];
 
-    if (this->_arrayForm && mat2._arrayForm) {
+    if (this->_arrayForm || mat2._arrayForm) {
         matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
     }
     else {

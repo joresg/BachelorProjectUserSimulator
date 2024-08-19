@@ -9,6 +9,11 @@ enum LayerActivationFuncs {
 	leakyReLU
 };
 
+enum GatedUnits {
+	NoGates,
+	GRU
+};
+
 class CUDAMatrix
 {
 private:

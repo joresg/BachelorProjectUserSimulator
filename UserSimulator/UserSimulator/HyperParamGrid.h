@@ -11,7 +11,7 @@ private:
 	//todo dropout rate
 	//todo weight init uniform, normal, xavier, he....
 public:
-	HyperParamGrid(int allClasses);
+	HyperParamGrid(int allClasses, GatedUnits gatedCells);
 
 	std::vector<std::tuple<double, std::vector<std::tuple<int, LayerActivationFuncs>>, int, int>> HyperParameterGridSearch();
 };

@@ -38,10 +38,12 @@ public:
 	void SetTrainingSequenceLength(int seqLength) { _trainingSeqLength = seqLength; }
 	int GetTrainingSequenceLength() { return _trainingSeqLength; }
 	void SetBatchSize(int newBatchSize) { _batchSize = newBatchSize; }
+	void SetGatedUnits(GatedUnits gu) { _gatedUnits = gu; }
+	GatedUnits GetGatedUnits() { return _gatedUnits; }
 
 private:
 	MathHandler* _mathHandler;
-
+	GatedUnits _gatedUnits;
 	std::vector<CUDAMatrix> _inputWeights;
 	std::vector<CUDAMatrix> _hiddenWeights;
 	CUDAMatrix _weightsOutput;
