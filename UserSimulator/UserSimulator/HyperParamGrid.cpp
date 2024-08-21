@@ -24,6 +24,7 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination11;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination12;
+	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination13;
 
 
 	int hiddenNuronsCount1 = allClasses / 2;
@@ -54,30 +55,22 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	hiddenNeuronsCombination12.push_back(std::make_tuple(hiddenNuronsCount3, leakyReLUA));
 	hiddenNeuronsCombination12.push_back(std::make_tuple(hiddenNuronsCount3, tanhA));
 
-	//_hiddenUnits.push_back(hiddenNeuronsCombination10);
+	hiddenNeuronsCombination13.push_back(std::make_tuple(hiddenNuronsCount3, tanhA));
 
 	if (gatedCells == NoGates)
 	{
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);
 		_hiddenUnits.push_back(hiddenNeuronsCombination2);
-		_hiddenUnits.push_back(hiddenNeuronsCombination10);
-
-		/*_hiddenUnits.push_back(hiddenNeuronsCombination1);
-		_hiddenUnits.push_back(hiddenNeuronsCombination4);
-		_hiddenUnits.push_back(hiddenNeuronsCombination2);
+		_hiddenUnits.push_back(hiddenNeuronsCombination13);
 		_hiddenUnits.push_back(hiddenNeuronsCombination5);
-		_hiddenUnits.push_back(hiddenNeuronsCombination3);
-		_hiddenUnits.push_back(hiddenNeuronsCombination6);
-		_hiddenUnits.push_back(hiddenNeuronsCombination8);
 		_hiddenUnits.push_back(hiddenNeuronsCombination9);
-		_hiddenUnits.push_back(hiddenNeuronsCombination10);*/
 
 		_sequenceLength.push_back(5);
-		_sequenceLength.push_back(10);
+		/*_sequenceLength.push_back(10);
 		_sequenceLength.push_back(15);
 		_sequenceLength.push_back(20);
 		_sequenceLength.push_back(25);
-		_sequenceLength.push_back(30);
+		_sequenceLength.push_back(30);*/
 	}
 	else {
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);

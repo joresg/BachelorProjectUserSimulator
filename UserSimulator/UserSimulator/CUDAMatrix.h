@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdexcept>
 
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
+
 #pragma once
 enum LayerActivationFuncs {
 	reluAct,
@@ -17,11 +20,34 @@ enum GatedUnits {
 class CUDAMatrix
 {
 private:
+	friend class boost::serialization::access;
+
 	int _rows;
 	int _cols;
 	double* _underlyingMatrix;
 	bool _arrayForm;
 	bool _vectorForm;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& _rows;
+		ar& _cols;
+		ar& _arrayForm;
+		ar& _vectorForm;
+
+		if (Archive::is_saving::value) {
+			std::vector<double> temp(_underlyingMatrix, _underlyingMatrix + _rows * _cols);
+			ar& temp;
+		}
+
+		if (Archive::is_loading::value) {
+			std::vector<double> temp;
+			ar& temp;
+			if (_underlyingMatrix) delete[] _underlyingMatrix;
+			_underlyingMatrix = new double[_rows * _cols];
+			std::copy(temp.begin(), temp.end(), _underlyingMatrix);
+		}
+	}
 public:
 	//CUDAMatrix();
 	CUDAMatrix(int rows, int cols);

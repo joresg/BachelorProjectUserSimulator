@@ -6,6 +6,14 @@
 
 #include <stdio.h>
 
+using json = nlohmann::json;
+
+static void SerializeModel(UserSimulator* userSimulator) {
+	std::ofstream ofs("user_simulator.dat");
+	boost::archive::text_oarchive oa(ofs);
+	oa << userSimulator;
+}
+
 static CUDAMatrix CreateOneHotEncodedVecNormalized(int allClases, int classID) {
 	CUDAMatrix oneHotEncodedVector(allClases, 1);
 	for (int i = 0; i < allClases; i++) {
@@ -176,271 +184,230 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 }
 
 int main() {
-	//CUDAMathTest(userSimulator);
 	UserSimulator* bestModel = nullptr;
+	int allClasses;
+	bool trainModel = true;
 
-	bool verboseMode = false;
+	if (trainModel)
+	{
+		bool verboseMode = false;
 
-	// 0 regular 1 GRU
-	int RNNType = 0;
+		// 0 regular 1 GRU
+		int RNNType = 0;
 
-	FileManager* fileManager = new FileManager();
-	std::vector<std::vector<int>> allSequencesFromFile;
-	std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
+		FileManager* fileManager = new FileManager();
+		std::vector<std::vector<int>> allSequencesFromFile;
+		std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
 
-	//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\YWDClickSeq.txt)";
-	const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
-	//std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)");
-	std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(filePath);
+		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\YWDClickSeq.txt)";
+		const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
+		//std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)");
+		std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(filePath);
 
-	int allClasses = commandIDsMap.size();
-	int inputNeurons = allClasses;
-	int outputNeurons = allClasses;
+		allClasses = commandIDsMap.size();
+		int inputNeurons = allClasses;
+		int outputNeurons = allClasses;
 
-	HyperParamGrid* paramGridSearch = new HyperParamGrid(allClasses, RNNType == 0 ? NoGates : GRU);
+		HyperParamGrid* paramGridSearch = new HyperParamGrid(allClasses, RNNType == 0 ? NoGates : GRU);
 
-	// learning rate, hidden units, seq length, batch size
-	for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
+		// learning rate, hidden units, seq length, batch size
+		for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
 
-		cudaDeviceReset();
+			cudaDeviceReset();
 
-		//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)", true, std::get<2>(paramCombo));
-		readFileRes = fileManager->ReadTXTFile(filePath, true, std::get<2>(paramCombo));
-		allSequencesFromFile = std::get<0>(readFileRes);
+			//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)", true, std::get<2>(paramCombo));
+			readFileRes = fileManager->ReadTXTFile(filePath, true, std::get<2>(paramCombo));
+			allSequencesFromFile = std::get<0>(readFileRes);
 
-		// split into training and validation set
+			// split into training and validation set
 
-		int trainingSetSize = allSequencesFromFile.size() * 0.9;
-		int validationSetSize = allSequencesFromFile.size() - trainingSetSize;
+			int trainingSetSize = allSequencesFromFile.size() * 0.9;
+			int validationSetSize = allSequencesFromFile.size() - trainingSetSize;
 
-		std::vector<std::vector<int>> trainingSet;
-		std::vector<std::vector<int>> validationSet;
+			std::vector<std::vector<int>> trainingSet;
+			std::vector<std::vector<int>> validationSet;
 
-		UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
-		if(RNNType == 1) userSimulator->SetGatedUnits(GRU);
+			UserSimulator* userSimulator = new UserSimulator(inputNeurons, std::get<1>(paramCombo), outputNeurons, std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
+			userSimulator->SetAllClasses(allClasses);
+			if (RNNType == 1) userSimulator->SetGatedUnits(GRU);
+			userSimulator->SetCmdIDsMap(commandIDsMap);
 
-		std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
+			std::shuffle(allSequencesFromFile.begin(), allSequencesFromFile.end(), userSimulator->GetMathEngine()->GetRandomEngine());
 
-		for (int i = 0; i < trainingSetSize; i++) {
-			trainingSet.push_back(allSequencesFromFile[i]);
-		}
-
-		for (int i = trainingSetSize; i < allSequencesFromFile.size(); i++) {
-			validationSet.push_back(allSequencesFromFile[i]);
-			//userSimulator->GetValidationSet().push_back(allSequencesFromFile[i]);
-		}
-
-		userSimulator->SetValidationSet(validationSet);
-
-		int batchSize = userSimulator->GetBatchSize();
-		int currentEpoch = 0;
-		int maxAccEpoch = 0;
-		double maxAccAchieved = 0;
-		double desiredAcc = 0.9;
-		int progress = 1;
-
-		std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string{},
-			[](const std::string& acc, const std::tuple<int, LayerActivationFuncs>& elem) {
-				int num = std::get<0>(elem);
-				const LayerActivationFuncs& obj = std::get<1>(elem);
-				std::stringstream ss;
-				ss << acc;
-				if (!acc.empty()) {
-					ss << ", ";
-				}
-				int pos = static_cast<LayerActivationFuncs>(obj);
-				//ss << num << ":" << obj;
-				std::string actFuncName = "";
-				if (pos == 0) actFuncName = "ReLU";
-				else if (pos == 1) actFuncName = "tanh";
-				else if (pos == 2) actFuncName = "sigmoid";
-				else if (pos == 3) actFuncName = "leakyReLU";
-				//ss << num << ":" << (pos == 0 ? "relu" : "tanh");
-				ss << num << ":" << actFuncName;
-
-				return ss.str();
-			});
-
-		std::string RNNType = userSimulator->GetGatedUnits() == NoGates ? "Classic RNN" : "GRU";
-
-		printf("%s, learning rate: %f, allClasses: %d, hidden units: {%s}, seq length: %d, batch size: %d\n", RNNType.c_str(), std::get<0>(paramCombo), allClasses, hiddenNeuronsString.c_str(), std::get<2>(paramCombo), std::get<3>(paramCombo));
-		printf("best model so far: %f\n", bestModel != nullptr ? bestModel->GetModelACcOnValidationData() : -1);
-
-		//printf("testing before learning\n");
-		//double currentAccStart = userSimulator->EvaluateOnValidateSet();
-		//printf("accuracy before learning: %f\n", currentAccStart);
-
-		while (true) {
-			progress = 1;
-			std::cout << "EPOCH: " << currentEpoch << std::endl;
-
-			// BATCH IMPLEMENTATION
-
-			int trainingExamplesCount = trainingSet.size();
-			userSimulator->SetAllTrainingExamplesCount(trainingExamplesCount);
-
-			for (int k = 0; k < trainingExamplesCount; k += batchSize) {
-				std::vector<std::vector<int>>::const_iterator first = trainingSet.begin() + k;
-				std::vector<std::vector<int>>::const_iterator last = trainingSet.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount);
-				std::vector<std::vector<int>> newVec(first, last);
-				userSimulator->SetBatchSize(newVec.size());
-				std::vector<CUDAMatrix> oneHotEncodedInput = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, allClasses, userSimulator->GetBatchSize());
-
-				if (k > 0 && k / (int)(trainingExamplesCount * 0.1) >= progress && progress <= 10) {
-					std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
-					progress++;
-				}
-				//printf("iteration: %d / %d\n", k, trainingExamplesCount);
-
-				userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true);
+			for (int i = 0; i < trainingSetSize; i++) {
+				trainingSet.push_back(allSequencesFromFile[i]);
 			}
 
-			userSimulator->SetBatchSize(batchSize);
-
-			// run validation for early stoppping
-
-			if (currentEpoch >= 0)
-			{
-				double currentAcc = userSimulator->EvaluateOnValidateSet();
-				if (currentAcc >= desiredAcc) {
-					maxAccAchieved = currentAcc;
-					printf("%f accuarcy reached...\n", desiredAcc);
-					break;
-				}
-				else if (currentAcc < maxAccAchieved + 0.01 && currentEpoch - maxAccEpoch >= 2) {
-					printf("learning converged....\n");
-					userSimulator->RestoreBestParameters();
-					break;
-				}
-				else if (currentAcc > maxAccAchieved + 0.005) {
-					maxAccAchieved = currentAcc;
-					maxAccEpoch = currentEpoch;
-					userSimulator->CopyParameters();
-				}
-				else if (currentAcc < maxAccAchieved - 0.06 || currentAcc < 0.05) {
-					printf("model deteriorated too much stopping training\n");
-					userSimulator->RestoreBestParameters();
-					break;
-				}
+			for (int i = trainingSetSize; i < allSequencesFromFile.size(); i++) {
+				validationSet.push_back(allSequencesFromFile[i]);
+				//userSimulator->GetValidationSet().push_back(allSequencesFromFile[i]);
 			}
 
-			currentEpoch++;
-		}
+			userSimulator->SetValidationSet(validationSet);
 
-		userSimulator->SetModelAccOnValidationData(maxAccAchieved);
+			int batchSize = userSimulator->GetBatchSize();
+			int currentEpoch = 0;
+			int maxAccEpoch = 0;
+			double maxAccAchieved = 0;
+			double desiredAcc = 0.9;
+			int progress = 1;
 
-		if (bestModel == nullptr || maxAccAchieved > bestModel->GetModelACcOnValidationData()) bestModel = userSimulator;
+			std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string{},
+				[](const std::string& acc, const std::tuple<int, LayerActivationFuncs>& elem) {
+					int num = std::get<0>(elem);
+					const LayerActivationFuncs& obj = std::get<1>(elem);
+					std::stringstream ss;
+					ss << acc;
+					if (!acc.empty()) {
+						ss << ", ";
+					}
+					int pos = static_cast<LayerActivationFuncs>(obj);
+					//ss << num << ":" << obj;
+					std::string actFuncName = "";
+					if (pos == 0) actFuncName = "ReLU";
+					else if (pos == 1) actFuncName = "tanh";
+					else if (pos == 2) actFuncName = "sigmoid";
+					else if (pos == 3) actFuncName = "leakyReLU";
+					//ss << num << ":" << (pos == 0 ? "relu" : "tanh");
+					ss << num << ":" << actFuncName;
 
-		if (maxAccAchieved >= 0.99) break;
-	}
+					return ss.str();
+				});
 
-	printf("FINISHED TRAINING\n");
-	//userSimulator->PrintAllParameters();
+			std::string RNNType = userSimulator->GetGatedUnits() == NoGates ? "Classic RNN" : "GRU";
 
+			printf("%s, learning rate: %f, allClasses: %d, hidden units: {%s}, seq length: %d, batch size: %d\n", RNNType.c_str(), std::get<0>(paramCombo), allClasses, hiddenNeuronsString.c_str(), std::get<2>(paramCombo), std::get<3>(paramCombo));
+			printf("best model so far: %f\n", bestModel != nullptr ? bestModel->GetModelACcOnValidationData() : -1);
 
-	// take user input for first click
+			while (true) {
+				progress = 1;
+				std::cout << "EPOCH: " << currentEpoch << std::endl;
 
-	//printf("BIASES OUTPUT\n");
-	//bestModel->GetBiasesOutput().Print();
+				// BATCH IMPLEMENTATION
 
-	for (auto it = commandIDsMap.cbegin(); it != commandIDsMap.cend(); ++it)
-	{
-		std::cout << it->first << " - " << it->second << "\n";
-	}
+				int trainingExamplesCount = trainingSet.size();
+				userSimulator->SetAllTrainingExamplesCount(trainingExamplesCount);
 
-	//test it feeding it only the first click.....
-	int firstClickClassID = -1;
-	bool readFirstClick = true;
-	while (readFirstClick)
-	{
-		std::cout << "input first click ID" << std::endl;
-		std::string input;
-		std::vector<int> splitInputIntegers;
-		int sequenceLength;
-		std::getline(std::cin, input);
+				for (int k = 0; k < trainingExamplesCount; k += batchSize) {
+					std::vector<std::vector<int>>::const_iterator first = trainingSet.begin() + k;
+					std::vector<std::vector<int>>::const_iterator last = trainingSet.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount);
+					std::vector<std::vector<int>> newVec(first, last);
+					userSimulator->SetBatchSize(newVec.size());
+					std::vector<CUDAMatrix> oneHotEncodedInput = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, allClasses, userSimulator->GetBatchSize());
 
-		if (std::strcmp("q", input.c_str()) == 0) {
-			readFirstClick = false;
-			break;
-		}
-		//split if sequence
-		if (input.find(",") != std::string::npos) {
-			std::vector<std::string> inputSplit = split(input, ',');
-			for (const std::string& i : inputSplit) splitInputIntegers.push_back(std::stoi(i));
-			firstClickClassID = splitInputIntegers[0];
-		}
-		else {
-			firstClickClassID = std::stoi(input);
-			splitInputIntegers.push_back(firstClickClassID);
+					if (k > 0 && k / (int)(trainingExamplesCount * 0.1) >= progress && progress <= 10) {
+						std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
+						progress++;
+					}
+					//printf("iteration: %d / %d\n", k, trainingExamplesCount);
 
-		}
+					userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true);
+				}
 
-		std::cout << "input generated sequence length" << std::endl;
-		std::getline(std::cin, input);
-		sequenceLength = std::stoi(input);
+				userSimulator->SetBatchSize(batchSize);
 
+				// run validation for early stoppping
 
-		std::vector<CUDAMatrix> generatedSequence;
-		//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, firstClickClassID));
-		for (const int& i : splitInputIntegers) generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i));
+				if (currentEpoch >= 3)
+				{
+					double currentAcc = userSimulator->EvaluateOnValidateSet();
 
-		std::vector<int> generatedSequenceClassIDs;
-		//generatedSequenceClassIDs.push_back(firstClickClassID);
-		for (const int& i : splitInputIntegers) generatedSequenceClassIDs.push_back(i);
-
-		std::cout << "started generating sequence with: " << firstClickClassID << std::endl;
-
-		//predict a sequence of length n
-		/*int n = sequence.size();*/
-
-		for (int i = 0; i < sequenceLength - splitInputIntegers.size(); i++) {
-			//clickPredictor->ForwardProp()
-			//int predictedClassID = std::get<0>(userSimulator->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false).back());
-			int predictedClassID = std::get<0>(bestModel->PredictNextClickFromSequence(generatedSequence, false, verboseMode, false, 10).back());
-
-			// randomness experiment
-			//generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, i % 5 == 0 ? 2 : predictedClassID));
-			generatedSequence.push_back(CreateOneHotEncodedVecNormalized(allClasses, predictedClassID));
-
-			if (generatedSequence.size() > bestModel->GetTrainingSequenceLength() - 1) generatedSequence.erase(generatedSequence.begin());
-
-			// randomness experiment
-			//generatedSequenceClassIDs.push_back(i % 5 == 0 ? 2 : predictedClassID);
-			generatedSequenceClassIDs.push_back(predictedClassID);
-
-			bestModel->PrintPredictedClassProbabilities();
-			std::cout << "Predicted ClassID: " << predictedClassID << std::endl;
-
-			for (int j = 0; j < generatedSequenceClassIDs.size(); j++) {
-				std::cout << generatedSequenceClassIDs[j];
-
-				//for (const auto& keyval : commandIDsMap) // Look at each key-value pair
-				//{
-				//    if (keyval.second == predictedClassID) // If the value is 0...
-				//    {
-				//        return keyval.first; // ...return the first element in the pair
-				//    }
-				//}
-
-				//std::string cmdName;
-
-				for (auto X : commandIDsMap)
-					if (X.second == generatedSequenceClassIDs[j]) {
-						//cmdName = X.first;
-						std::cout << "(" << X.first << ") ";
+					if (currentAcc < 0.5) {
+						printf("lr too low, converging to slow...\n");
+						break;
+					}
+					else if (currentAcc >= desiredAcc) {
+						maxAccAchieved = currentAcc;
+						printf("%f accuarcy reached...\n", desiredAcc);
+						break;
+					}
+					else if (currentAcc < maxAccAchieved + 0.01 && currentEpoch - maxAccEpoch >= 2) {
+						printf("learning converged....\n");
+						userSimulator->RestoreBestParameters();
+						break;
+					}
+					else if (currentAcc > maxAccAchieved + 0.005) {
+						maxAccAchieved = currentAcc;
+						maxAccEpoch = currentEpoch;
+						userSimulator->CopyParameters();
+					}
+					else if (currentAcc < maxAccAchieved - 0.04) {
+						printf("model unstable, lowering lr\n");
+						userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
+						break;
+					}
+					else if (currentAcc < maxAccAchieved - 0.08 || currentAcc < 0.05) {
+						printf("model deteriorated too much stopping training\n");
+						userSimulator->RestoreBestParameters();
 						break;
 					}
 
-
-				//std::cout << "(" << cmdName << ") ";
-				if (j != generatedSequenceClassIDs.size() - 1) std::cout << " -> ";
+					/*if (currentAcc >= 0.7) {
+						printf("lowering learning rate...\n");
+						userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
+					}*/
+				}
+				currentEpoch++;
 			}
 
-			std::cout << std::endl;
+			userSimulator->SetModelAccOnValidationData(maxAccAchieved);
+
+			if (bestModel == nullptr || maxAccAchieved > bestModel->GetModelACcOnValidationData()) bestModel = userSimulator;
+
+			if (maxAccAchieved >= 0.7) break;
 		}
+
+		printf("FINISHED TRAINING\n");
+		//userSimulator->PrintAllParameters();
+
+		SerializeModel(bestModel);
+	}
+	else {
+		bestModel = new UserSimulator();
+		std::ifstream ifs("user_simulator.dat");
+		boost::archive::text_iarchive ia(ifs);
+		ia >> bestModel;
+		allClasses = bestModel->GetAllClasses();
 	}
 
+	crow::SimpleApp app;
+
+	CROW_ROUTE(app, "/predictNextAction").methods(crow::HTTPMethod::POST)([&](const crow::request& req) {
+		auto input_json = json::parse(req.body);
+
+		// Assume input sequence is an array of integers in JSON
+		std::vector<std::string> inputSequenceStrings = input_json["sequence"].get<std::vector<std::string>>();
+		std::vector<int> inputSequence;
+		for (const auto& cmdName : inputSequenceStrings) {
+			inputSequence.push_back(bestModel->GetCommandIDFromName(cmdName));
+		}
+
+		std::vector<CUDAMatrix> oneHotEncodedSequence = bestModel->GetMathEngine()->CreateOneHotEncodedVector(inputSequence, allClasses);
+
+		std::deque<std::tuple<int, double>> predictedSequenceIDs = bestModel->PredictNextClickFromSequence(oneHotEncodedSequence, false, false, false, 10);
+
+		std::deque<std::tuple<std::string, double>> predictedSequence;
+
+		for (const auto& predictedCommand : predictedSequenceIDs) {
+			//double cmdProbability = const_cast<double&>(std::get<1>(predictedCommand));
+			double cmdProbability = std::get<1>(predictedCommand);
+			predictedSequence.push_back(std::make_tuple<std::string, double>(bestModel->GetCommandNameFromID(std::get<0>(predictedCommand)), cmdProbability * 1));
+		}
+
+		json response;
+		response["predicted_sequence"] = predictedSequence;
+
+		return crow::response(response.dump());
+		});
+
+	app.port(18080).multithreaded().run();
+
 	return 0;
+}
+
+UserSimulator::UserSimulator(){
+	unsigned long int randSeed = 18273;
+	_mathHandler = new MathHandler(randSeed);
 }
 
 UserSimulator::UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : 
@@ -622,7 +589,7 @@ double UserSimulator::EvaluateOnValidateSet() {
 		}
 		std::vector<CUDAMatrix> oneHotEncodedValidationClickSequenceExample = _mathHandler->CreateOneHotEncodedVector(_validationSet[i], _allClasses);
 		//for (int j = 0; j < _validationSet[i].size() - 1; j += _validationSet[i].size() / 5) {
-		for (int j = 0; j < 1; j++) {
+		for (int j = 0; j < _validationSet[i].size() - 1; j++) {
 			clickSequence.clear();
 			std::vector<CUDAMatrix>::const_iterator first = oneHotEncodedValidationClickSequenceExample.begin();
 			std::vector<CUDAMatrix>::const_iterator last = oneHotEncodedValidationClickSequenceExample.begin() + j + 1;
@@ -1103,10 +1070,6 @@ void UserSimulator::BackPropGated(std::vector<CUDAMatrix> oneHotEncodedLabels, d
 }
 
 void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode) {
-	//_inputWeights.Print();
-	//printf("onehotEncodedInput\n");
-	//onehotEncodedInput.Print();
-
 	std::vector<CUDAMatrix> allHiddenLayers;
 
 	CUDAMatrix XI;
@@ -1158,25 +1121,8 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 	}
 
 	CUDAMatrix outputValuesActivated = outputValuesUnactivated.exp();
-	//printf("outputValuesUnactivated\n");
-	//outputValuesUnactivated.Print();
-	//printf("outputValuesActivated after exp\n");
-	//outputValuesActivated.Print();
-	//sumsForSoftmax.Print();
-
-	// use CUDA instead
-	/*for (int i = 0; i < outputValuesActivated.GetRows(); i++) {
-		outputValuesActivated(i, 0) = std::exp(outputValuesUnactivated(i, 0)) / sumForSoftmax;
-	}*/
 
 	outputValuesActivated = outputValuesActivated.Array() / sumsForSoftmax.Array();
-	//printf("outputValuesActivated\n");
-	//outputValuesActivated.Print();
-
-	//printf("outputValuesActivated\n");
-	//outputValuesActivated.Print();
-
-	//std::cout << "PREDICTED: " << std::endl << outputValuesActivated << std::endl;
 
 	_outputValues.push_back(outputValuesActivated);
 
@@ -1187,7 +1133,7 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 	}
 
 	// test print predicted sequence
-	double classID = -1;
+	/*double classID = -1;
 
 	double maxProbability = 0;
 	for (int j = 0; j < outputValuesActivated.GetRows(); j++) {
@@ -1195,11 +1141,11 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 			maxProbability = outputValuesActivated(j, 0);
 			classID = j;
 		}
-	}
+	}*/
 
 	// calculate loss for debugging purposes
-	double crossEntropyLoss = 0;
-	_totalLoss -= std::log(maxProbability);
+	/*double crossEntropyLoss = 0;
+	_totalLoss -= std::log(maxProbability);*/
 }
 
 void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode) {
@@ -1237,26 +1183,26 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		CUDAMatrix hiddenGrad;
 		for (int layer = _hiddenWeights.size() - 1; layer >= 0; layer--) {
 			if (layer == _hiddenWeights.size() - 1) {
-				hiddenGrad = (_weightsOutput.transpose() * outputGrad).Array() * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]).Array();
+				hiddenGrad = (_weightsOutput.transpose() * outputGrad) * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]).Array();
 			}
 			else {
 				hiddenGrad = _inputWeights[layer + 1] * nextLayerGradient + _hiddenWeights[layer].transpose() * nextHiddenGrad[layer];
 
-				hiddenGrad = hiddenGrad.Array() * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]).Array();
+				hiddenGrad = hiddenGrad * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]).Array();
 			}
 
 			// Accumulate gradients for hidden layer weights and biases
 			if (t > 0) {
-				hiddenWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t - 1][layer]);
+				hiddenWeightsGrad[layer] += hiddenGrad * _hiddenStepValues[t - 1][layer].transpose();
 			}
 			hiddenBiasGrad[layer] += hiddenGrad;
 
 			// Accumulate gradients for input weights
 			if (layer == 0) {
-				inputWeightsGrad[layer] += hiddenGrad * _mathHandler->TransposeMatrix(_oneHotEncodedClicks[t]);
+				inputWeightsGrad[layer] += hiddenGrad * _oneHotEncodedClicks[t].transpose();
 			}
 			else if (layer < _hiddenWeights.size() - 1) {
-				inputWeightsGrad[layer] += (hiddenGrad * _mathHandler->TransposeMatrix(_hiddenStepValues[t][layer - 1])).transpose();
+				inputWeightsGrad[layer] += (hiddenGrad * _hiddenStepValues[t][layer - 1].transpose()).transpose();
 			}
 			// Update nextHiddenGrad for the next iteration of layer and timestep
 			nextHiddenGrad[layer] = hiddenGrad;
@@ -1306,19 +1252,6 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 		else if (_gatedUnits == GRU) ForwardPropGated(onehotEncodedLabels[i], i, verboseMode, trainMode);
 	}
 
-	//printf("----------------------------finished forward prop-----------------------------------------\n");
-	//PrintAllParameters();
-
-	/*printf("hidden values and output values after forward prop\n");
-	printf("hidden\n");
-	for (int i = 0; i < _hiddenStepValues.size(); i++) {
-		_hiddenStepValues[i].Print();
-	}
-	printf("output\n");
-	for (int i = 0; i < _outputValues.size(); i++) {
-		_outputValues[i].Print();
-	}*/
-
 	int firstClickID = -1;
 	int classID = -1;
 
@@ -1367,23 +1300,6 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 				// figure out at which position to insert if probability is high enough
 
-				//if (lastTimeStep(i, 0) > std::get<1>(topNIDs.front())) {
-				//	//maxProbability = _outputValues[i](j, 0);
-				//	//classID = j;
-				//	//std::sort(topNIDs.front(), topNIDs.back());
-
-				//	int tuplePos = 0;
-
-				//	for (std::tuple<int, int>& tuple : topNIDs) {
-				//		if(lastTimeStep(i, 0) > std::get<1>(tuple))
-				//	}
-
-				//	std::sort(topNIDs.begin(), topNIDs.end());
-				//}
-
-				//classID = i;
-				//double classProbability = lastTimeStep(i, 0);
-
 				if (lastTimeStep(i, 0) > std::get<1>(topNIDs.front()))
 				{
 					std::tuple<int, double>& tupleToChange = topNIDs.front();
@@ -1411,7 +1327,6 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 	// after going through whole sequence perform backprop
 
-	//BackProp(onehotEncodedLabels[onehotEncodedLabels.size() - 1], _learningRate);
 	if (performBackProp && _gatedUnits == NoGates) BackProp(onehotEncodedLabels, _learningRate, verboseMode);
 	else if (performBackProp && _gatedUnits == GRU) BackPropGated(onehotEncodedLabels, _learningRate, verboseMode);
 
@@ -1419,10 +1334,10 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 		return std::get<1>(a) < std::get<1>(b);
 	});
 	
-	// todo make min threshold optional, for now take if prob more than 1%
+	// todo make min threshold optional
 	while (!topNIDs.empty()) {
 		//if (std::get<1>(topNIDs.front()) > minTopNProbabilitiesThreshold) break;
-		if (std::get<1>(topNIDs.front()) > 0.05) break;
+		if (std::get<1>(topNIDs.front()) > 1.0 / allClasses * 10.0) break;
 		topNIDs.pop_front();
 	}
 

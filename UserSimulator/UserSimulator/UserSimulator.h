@@ -1,10 +1,24 @@
 #include "MathHandler.cuh"
+#include "crow.h"
+#include "nlohmann/json.hpp"
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <fstream>
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/deque.hpp>
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/string.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <boost/serialization/unique_ptr.hpp>
+#include <boost/serialization/shared_ptr.hpp>
 
 #pragma once
 class UserSimulator
 {
 public:
 	UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
+	UserSimulator();
 	double EvaluateOnValidateSet();
 	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, int selectNTopClasses = 1);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
@@ -33,6 +47,7 @@ public:
 	void CopyParameters();
 	void RestoreBestParameters();
 	void SetLearningRate(double lr) { _learningRate = lr; }
+	double GetLearningRate() { return _learningRate; }
 	void SetModelAccOnValidationData(double accuracy) { _modelAccuracy = accuracy; }
 	double GetModelACcOnValidationData() { return _modelAccuracy; }
 	void SetTrainingSequenceLength(int seqLength) { _trainingSeqLength = seqLength; }
@@ -40,8 +55,26 @@ public:
 	void SetBatchSize(int newBatchSize) { _batchSize = newBatchSize; }
 	void SetGatedUnits(GatedUnits gu) { _gatedUnits = gu; }
 	GatedUnits GetGatedUnits() { return _gatedUnits; }
+	void SetCmdIDsMap(std::map<std::string, int> commandIDsMap) { _commandIDsMap = commandIDsMap; }
+	std::map<std::string, int> GetCmdIDsMap() { return _commandIDsMap; }
+	int GetCommandIDFromName(std::string cmdName) {
+		return _commandIDsMap[cmdName];
+	}
+	std::string GetCommandNameFromID(int cmdID) {
+		for (const auto& keyval : _commandIDsMap)
+		{
+			if (keyval.second == cmdID)
+			{
+				return keyval.first;
+			}
+		}
+	}
+	int GetAllClasses() { return _allClasses; }
+	void SetAllClasses(int allClasses) { _allClasses = allClasses; }
 
 private:
+	friend class boost::serialization::access;
+
 	MathHandler* _mathHandler;
 	GatedUnits _gatedUnits;
 	std::vector<CUDAMatrix> _inputWeights;
@@ -92,4 +125,30 @@ private:
 	double _momentumCoefficient;
 
 	std::vector<std::vector<int>> _validationSet;
+	std::map<std::string, int> _commandIDsMap;
+
+	template<class Archive>
+	void serialize(Archive& ar, const unsigned int version) {
+		ar& _gatedUnits;
+		ar& _inputWeights;
+		ar& _hiddenWeights;
+		ar& _weightsOutput;
+		ar& _biasesHidden;
+		ar& _biasesOutput;
+		ar& _velocityWeightsInput;
+		ar& _velocityWeightsHidden;
+		ar& _velocityBias;
+		ar& _inputNeurons;
+		ar& _hiddenLayerNeurons;
+		ar& _hiddenLayerNeuronsActivationFuncs;
+		ar& _outputNeurons;
+		ar& _learningRate;
+		ar& _batchSize;
+		ar& _allTrainingExamplesCount;
+		ar& _allClasses;
+		ar& _modelAccuracy;
+		ar& _trainingSeqLength;
+		ar& _momentumCoefficient;
+		ar& _commandIDsMap;
+	}
 };

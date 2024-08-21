@@ -16,4 +16,7 @@
     <ClInclude Include="CUDAMatrix.h" />
     <ClInclude Include="HyperParamGrid.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>
