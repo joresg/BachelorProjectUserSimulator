@@ -240,6 +240,10 @@ int main() {
 			// split into training and validation set
 
 			int trainingSetSize = allSequencesFromFile.size() * 0.8;
+
+			// batch can't be too big, let it be relative to training set size
+			if (std::get<3>(paramCombo) > trainingSetSize / 32) continue;
+
 			int validationSetSize = allSequencesFromFile.size() - trainingSetSize;
 
 			std::vector<std::vector<int>> trainingSet;
@@ -337,13 +341,14 @@ int main() {
 					double currentLoss = userSimulator->EvaluateOnValidateSet();
 
 					if (std::isinf(currentLoss) || currentLoss == DBL_MAX) break;
-					else if (currentLoss > maxAccAchieved - (maxAccAchieved * 0.1) && currentEpoch - maxAccEpoch > 5) {
+					else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) {
 						printf("learning converged....\n");
 						lastModelConverged = true;
 						userSimulator->RestoreBestParameters();
+						userSimulator->SetModelAccOnValidationData(maxAccAchieved);
 						break;
 					}
-					else if (currentLoss < maxAccAchieved - (maxAccAchieved * 0.02)) {
+					else if (currentLoss < maxAccAchieved * 0.99) {
 						maxAccAchieved = currentLoss;
 						maxAccEpoch = currentEpoch;
 						userSimulator->CopyParameters();
@@ -352,7 +357,7 @@ int main() {
 						printf("model unstable, lowering lr\n");
 						userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
 					}*/
-					else if (currentLoss > maxAccAchieved + maxAccAchieved * 0.3) {
+					else if (currentLoss > maxAccAchieved + maxAccAchieved * 0.2) {
 						printf("model deteriorated too much stopping training\n");
 						userSimulator->RestoreBestParameters();
 						break;
@@ -509,7 +514,7 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<std::tuple<int, Layer
 	// init input weigths
 	//_inputWeights.Resize(hiddenLayerNeurons, inputNeurons);
 	for (int iwc = 0; iwc < hiddenLayerNeurons.size(); iwc++) {
-		limit = std::sqrt(6 / (_inputWeights[iwc].GetRows() + _inputWeights[iwc].GetColumns()));
+		limit = std::sqrt(6.0 / (_inputWeights[iwc].GetRows() + _inputWeights[iwc].GetColumns()));
 		std::uniform_real_distribution<double> unif(-limit, limit);
 		for (int i = 0; i < _inputWeights[iwc].GetRows(); i++) {
 			for (int j = 0; j < _inputWeights[iwc].GetColumns(); j++) {
@@ -522,7 +527,7 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<std::tuple<int, Layer
 
 	// init hidden/recurrent weights
 	for (int hwc = 0; hwc < hiddenLayerNeurons.size(); hwc++) {
-		limit = std::sqrt(6 / (_hiddenWeights[hwc].GetRows() + _hiddenWeights[hwc].GetColumns()));
+		limit = std::sqrt(6.0 / (_hiddenWeights[hwc].GetRows() + _hiddenWeights[hwc].GetColumns()));
 		std::uniform_real_distribution<double> unif(-limit, limit);
 		for (int i = 0; i < _hiddenWeights[hwc].GetRows(); i++) {
 			for (int j = 0; j < _hiddenWeights[hwc].GetColumns(); j++) {
@@ -532,7 +537,7 @@ UserSimulator::UserSimulator(int inputNeurons, std::vector<std::tuple<int, Layer
 	}
 
 	// init output weights
-	limit = std::sqrt(6 / (_weightsOutput.GetRows() + _weightsOutput.GetColumns()));
+	limit = std::sqrt(6.0 / (_weightsOutput.GetRows() + _weightsOutput.GetColumns()));
 	std::uniform_real_distribution<double> unif(-limit, limit);
 	for (int i = 0; i < _weightsOutput.GetRows(); i++) {
 		for (int j = 0; j < _weightsOutput.GetColumns(); j++) {
@@ -1130,10 +1135,9 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 		outputValuesActivated.Print();
 	}
 
-	CUDAMatrix outputValuesMaskedWithNextActions = outputValuesActivated * (*nextAction).Array();
-
 	if (validationMode)
 	{
+		CUDAMatrix outputValuesMaskedWithNextActions = outputValuesActivated * (*nextAction).Array();
 		bool predictionFound = false;
 
 		for (int j = 0; j < outputValuesMaskedWithNextActions.GetColumns(); j++) {
@@ -1356,7 +1360,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 	for (int i = 0; i < onehotEncodedLabels.size() - (performBackProp || validationMode ? 1 : 0); i++) {
 
-		if (_gatedUnits == NoGates) ForwardProp(onehotEncodedLabels[i], i, verboseMode, trainMode, validationMode, &onehotEncodedLabels[i + 1]);
+		if (_gatedUnits == NoGates) ForwardProp(onehotEncodedLabels[i], i, verboseMode, trainMode, validationMode, validationMode ? &onehotEncodedLabels[i + 1] : nullptr);
 		else if (_gatedUnits == GRU) ForwardPropGated(onehotEncodedLabels[i], i, verboseMode, trainMode);
 	}
 
@@ -1446,7 +1450,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 	while (!topNIDs.empty()) {
 		//if (std::get<1>(topNIDs.front()) > minTopNProbabilitiesThreshold) break;
 		//if (std::get<1>(topNIDs.front()) > 1.0 / allClasses * 10.0) break;
-		if (std::get<1>(topNIDs.front()) > 1.0 / allClasses * 5.0) break;
+		if (std::get<1>(topNIDs.front()) >= 1.0 / allClasses * 5.0) break;
 		topNIDs.pop_front();
 	}
 

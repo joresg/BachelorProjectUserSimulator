@@ -7,7 +7,6 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
 	_learningRate.push_back(0.00001);
-	_learningRate.push_back(0.000001);
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination1;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination2;
@@ -73,9 +72,7 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 		_hiddenUnits.push_back(hiddenNeuronsCombination4);
 
 		_sequenceLength.push_back(10);
-		//_sequenceLength.push_back(15);
 		_sequenceLength.push_back(20);
-		//_sequenceLength.push_back(25);
 		_sequenceLength.push_back(30);
 	}
 	else {
@@ -93,8 +90,7 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	_batchSize.push_back(256);
 	_batchSize.push_back(128);
 	_batchSize.push_back(64);
-	_batchSize.push_back(32);
-	_batchSize.push_back(16);
+	_batchSize.push_back(8);
 }
 
 std::vector<std::tuple<double, std::vector<std::tuple<int, LayerActivationFuncs>>, int, int>> HyperParamGrid::HyperParameterGridSearch() {
