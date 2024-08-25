@@ -189,7 +189,7 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	UserSimulator* bestModel = nullptr;
 	int allClasses;
-	bool trainModel = true;
+	bool trainModel = false;
 
 	if (trainModel)
 	{
@@ -368,15 +368,14 @@ int main() {
 
 			userSimulator->SetModelAccOnValidationData(maxAccAchieved);
 
-			if (bestModel == nullptr || maxAccAchieved < bestModel->GetModelACcOnValidationData()) bestModel = userSimulator;
-
-			//if (maxAccAchieved >= desiredAcc) break;
+			if (bestModel == nullptr || maxAccAchieved < bestModel->GetModelACcOnValidationData()) {
+				bestModel = userSimulator;
+				SerializeModel(bestModel);
+			}
 		}
 
-		printf("FINISHED TRAINING\n");
-		//userSimulator->PrintAllParameters();
-
-		SerializeModel(bestModel);
+		printf("finished searching for optimal hpyerparameters\n");
+		//SerializeModel(bestModel);
 	}
 	else {
 		bestModel = new UserSimulator();
