@@ -18,9 +18,51 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 
 }
 
-enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, LeakyReLUDerivative, SigmoidDerivative, None};
+enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, LeakyReLUDerivative, SigmoidDerivative, None,
+DropoutMask};
 
 #pragma region CUDA kernels
+__device__ double atomicAddDouble(double* address, double val) {
+    unsigned long long int* address_as_ull =
+        (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
+
+    do {
+        assumed = old;
+        old = atomicCAS(address_as_ull, assumed,
+            __double_as_longlong(val +
+                __longlong_as_double(assumed)));
+
+    } while (assumed != old);
+
+    return __longlong_as_double(old);
+}
+
+__global__ void matrixNormKernel(const double* mat, double* norm, int rows, int cols) {
+    __shared__ double blockSum[256];
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    int index = threadIdx.x;
+
+    blockSum[index] = 0.0;
+
+    for (int i = tid; i < rows * cols; i += blockDim.x * gridDim.x) {
+        blockSum[index] += mat[i] * mat[i];
+    }
+    __syncthreads();
+
+    // Reduce within block
+    for (int stride = blockDim.x / 2; stride > 0; stride /= 2) {
+        if (index < stride) {
+            blockSum[index] += blockSum[index + stride];
+        }
+        __syncthreads();
+    }
+
+    if (index == 0) {
+        atomicAddDouble(norm, blockSum[0]);
+    }
+}
+
 // Kernel to add a column vector to each column of a matrix
 __global__ void addColumnVectorToMatrix(double* matrix, double* vector, double* result, int m, int n) {
     int col = blockIdx.x * blockDim.x + threadIdx.x;
@@ -53,7 +95,7 @@ __global__ void actFuncKernel(double* d_matrix, int width, int height, LayerActi
         int idx = y * width + x;
         if (fn == tanhAct) d_matrix[idx] = tanh(d_matrix[idx]);
         else if (fn == reluAct) d_matrix[idx] = fmax(0.0, d_matrix[idx]);
-        else if (fn == leakyReLU) d_matrix[idx] = d_matrix[idx] > 0 ? d_matrix[idx] : 0.01 * d_matrix[idx];
+        else if (fn == leakyReLU) d_matrix[idx] = d_matrix[idx] > 0 ? d_matrix[idx] : 0.02 * d_matrix[idx];
         else if (fn == sigAct) d_matrix[idx] = 1 / (1 + exp(-d_matrix[idx]));
     }
 }
@@ -112,7 +154,7 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
         else if (op == SquaredSubstractInvert) C[index] = -(pow(A[index], 2) - constValue);
         else if (op == Exp) C[index] = std::exp(A[index]);
         else if (op == ReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.0;
-        else if (op == LeakyReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.01;
+        else if (op == LeakyReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.02;
         else if (op == SigmoidDerivative) {
             double sigmoid = 1.0 / (1.0 + exp(-A[index]));
             C[index] = sigmoid * (1.0 - sigmoid);
@@ -129,6 +171,24 @@ __global__ void addVecKernel(double* c, const double* a, const double* b)
 #pragma endregion
 
 #pragma region kernel calls
+double computeMatrixNorm(const double* d_matrix, int rows, int cols) {
+    double* d_norm;
+    double h_norm = 0.0;
+
+    cudaMalloc(&d_norm, sizeof(double));
+    cudaMemcpy(d_norm, &h_norm, sizeof(double), cudaMemcpyHostToDevice);
+
+    int blockSize = 256;
+    int numBlocks = (rows * cols + blockSize - 1) / blockSize;
+
+    matrixNormKernel << <numBlocks, blockSize >> > (d_matrix, d_norm, rows, cols);
+
+    cudaMemcpy(&h_norm, d_norm, sizeof(double), cudaMemcpyDeviceToHost);
+    cudaFree(d_norm);
+
+    return sqrt(h_norm);
+}
+
 void AddMatrixAndColumnVec(double* matrix, double* vector, double* res, int m, int n) {
 
     // Device matrices
@@ -383,6 +443,26 @@ CUDAMatrix CUDAMatrix::RowAverage() {
 CUDAMatrix MathHandler::TransposeMatrix(CUDAMatrix inputMatrix) {
     return transposeMatrix(inputMatrix);
 }
+
+double CUDAMatrix::Norm() {
+    double* d_matrix;
+    cudaMalloc(&d_matrix, this->GetRows() * this->GetColumns() * sizeof(double));
+    cudaMemcpy(d_matrix, this->GetUnderlyingMatrix(), this->GetRows() * this->GetColumns() * sizeof(double), cudaMemcpyHostToDevice);
+
+    double norm = computeMatrixNorm(d_matrix, this->GetRows(), this->GetColumns());
+    cudaFree(d_matrix);
+    return norm;
+}
+
+CUDAMatrix CUDAMatrix::ClipByNorm(double threshhold) {
+    double matrixNorm = this->Norm();
+    if (matrixNorm > threshhold) {
+        double scalingFactor = threshhold / matrixNorm;
+        return *this * scalingFactor;
+    }
+    else return *this;
+
+}
 #pragma endregion
 
 #pragma region operator overloads
@@ -557,7 +637,26 @@ CUDAMatrix MathHandler::ActFuncDerivative(CUDAMatrix inputMatrix, LayerActivatio
     return resMatrix;
 }
 
-std::vector<CUDAMatrix> MathHandler::CreateOneHotEncodedVector(std::vector<int> cmdIDs, int allClasses) {
+int MathHandler::OneHotEncodedVectorToClassID(CUDAMatrix oneHotEncodedVector) {
+    if (oneHotEncodedVector.GetRows() == 1) {
+        for (int i = 0; i < oneHotEncodedVector.GetRows(); i++) {
+            if (oneHotEncodedVector(i, i) != 0) return i;
+        }
+    }
+    else {
+        for (int i = 0; i < oneHotEncodedVector.GetColumns(); i++) {
+            if (oneHotEncodedVector(0, i) != 0) return i;
+        }
+    }
+}
+
+CUDAMatrix MathHandler::CreateOneHotEncodedVector(int cmdID, int allClasses) {
+    CUDAMatrix oneHotEncodedLabel = CUDAMatrix::Zero(allClasses, 1);
+    oneHotEncodedLabel(cmdID, 0) = 1.0;
+    return oneHotEncodedLabel;
+}
+
+std::vector<CUDAMatrix> MathHandler::CreateOneHotEncodedVectorSequence(std::vector<int> cmdIDs, int allClasses) {
 
     std::vector<CUDAMatrix> oneHotEncodedClicks;
     CUDAMatrix oneHotEncodedLabel = CUDAMatrix::Zero(allClasses, 1);

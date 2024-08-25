@@ -61,6 +61,9 @@ public:
 	CUDAMatrix exp();
 	CUDAMatrix transpose();
 	CUDAMatrix RowAverage();
+	// Frobenius norm for gradient clipping
+	double Norm();
+	CUDAMatrix ClipByNorm(double threshhold);
 
 	int GetRows() const { return _rows; }
 	int GetColumns() const { return _cols; }

@@ -20,8 +20,10 @@ public:
 	//CUDAMatrix TanhDerivative(CUDAMatrix inputMatrix);
 	CUDAMatrix ActFuncDerivative(CUDAMatrix inputMatrix, LayerActivationFuncs actFunc);
 	std::default_random_engine GetRandomEngine() { return _re; }
-	std::vector<CUDAMatrix> CreateOneHotEncodedVector(std::vector<int> cmdIDs, int allClasses);
+	std::vector<CUDAMatrix> CreateOneHotEncodedVectorSequence(std::vector<int> cmdIDs, int allClasses);
 	std::vector<CUDAMatrix> CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, int allClasses, int batchSize);
+	CUDAMatrix CreateOneHotEncodedVector(int cmdID, int allClasses);
+	int OneHotEncodedVectorToClassID(CUDAMatrix oheInput);
 private:
 	unsigned long _randSeed;
 	std::uniform_real_distribution<double> _unif;

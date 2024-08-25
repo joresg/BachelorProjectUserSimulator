@@ -8,7 +8,6 @@ private:
 	std::vector<std::vector<std::tuple<int, LayerActivationFuncs>>> _hiddenUnits;
 	std::vector<int> _sequenceLength;
 	std::vector<int> _batchSize;
-	//todo dropout rate
 	//todo weight init uniform, normal, xavier, he....
 public:
 	HyperParamGrid(int allClasses, GatedUnits gatedCells);

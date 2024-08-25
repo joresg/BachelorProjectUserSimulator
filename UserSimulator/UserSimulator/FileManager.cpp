@@ -47,10 +47,11 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 	std::ifstream infile(filePath);
 	std::string line;
 	int seqLength = trainingSeqLength;
+	// sliding window seems to work best to split up very large sequences
 	int seqOverlap = seqLength - 1;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = -1;
+	int limitLines = 5000;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
@@ -109,7 +110,7 @@ std::map<std::string, int> FileManager::AllClassesFromFile(const char* filePath)
 	std::string line;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = -1;
+	int limitLines = 5000;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
