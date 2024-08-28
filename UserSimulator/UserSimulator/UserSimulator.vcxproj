@@ -87,6 +87,7 @@
     <ClInclude Include="FileManager.h" />
     <ClInclude Include="HyperParamGrid.h" />
     <ClInclude Include="MathHandler.cuh" />
+    <ClInclude Include="serialize_tuple.h" />
     <ClInclude Include="UserSimulator.h" />
   </ItemGroup>
   <ItemGroup>

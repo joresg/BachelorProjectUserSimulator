@@ -41,7 +41,7 @@
 //	return res;
 //}
 
-std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManager::ReadTXTFile(const char* filePath, bool isTrainData, int trainingSeqLength) {
+std::tuple<std::vector<std::vector<int>>, std::map<std::string, std::tuple<int, int>>> FileManager::ReadTXTFile(const char* filePath, bool isTrainData, int trainingSeqLength) {
 	std::vector<std::vector<int>> allSequences;
 
 	std::ifstream infile(filePath);
@@ -57,7 +57,7 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 
 	std::vector<int> seq;
 	std::vector<int> seqOverlapVec;
-	std::map<std::string, int> cmdIDs;
+	std::map<std::string, std::tuple<int, int>> cmdIDs;
 
 	while (std::getline(infile, line)) {
 		if (limitLines == 0) break;
@@ -65,11 +65,13 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 		// check if cmd already in map if not add with new ID
 
 		if (cmdIDs.count(line)) {
-			cmdID = cmdIDs[line];
+			cmdID = std::get<0>(cmdIDs[line]);
+			std::get<1>(cmdIDs[line]) = std::get<1>(cmdIDs[line]) + 1;
+
 		}
 		else {
 			cmdID = generatedID;
-			cmdIDs.insert({ line, cmdID });
+			cmdIDs.insert({ line, std::make_tuple(cmdID, 1) });
 			generatedID++;
 		}
 
@@ -100,10 +102,10 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> FileManage
 		limitLines--;
 	}
 
-	return std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>>(allSequences, cmdIDs);
+	return std::tuple<std::vector<std::vector<int>>, std::map<std::string, std::tuple<int, int>>>(allSequences, cmdIDs);
 }
 
-std::map<std::string, int> FileManager::AllClassesFromFile(const char* filePath) {
+int FileManager::AllClassesFromFile(const char* filePath) {
 	std::vector<std::vector<int>> allSequences;
 
 	std::ifstream infile(filePath);
@@ -133,5 +135,5 @@ std::map<std::string, int> FileManager::AllClassesFromFile(const char* filePath)
 		limitLines--;
 	}
 
-	return cmdIDs;
+	return cmdIDs.size();
 }

@@ -1,5 +1,6 @@
 #include "MathHandler.cuh"
 #include "crow.h"
+#include "serialize_tuple.h"
 #include "nlohmann/json.hpp"
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -9,7 +10,6 @@
 #include <boost/serialization/deque.hpp>
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/string.hpp>
-#include <boost/tuple/tuple.hpp>
 #include <boost/serialization/unique_ptr.hpp>
 #include <boost/serialization/shared_ptr.hpp>
 
@@ -56,15 +56,15 @@ public:
 	void SetBatchSize(int newBatchSize) { _batchSize = newBatchSize; }
 	void SetGatedUnits(GatedUnits gu) { _gatedUnits = gu; }
 	GatedUnits GetGatedUnits() { return _gatedUnits; }
-	void SetCmdIDsMap(std::map<std::string, int> commandIDsMap) { _commandIDsMap = commandIDsMap; }
-	std::map<std::string, int> GetCmdIDsMap() { return _commandIDsMap; }
+	void SetCmdIDsMap(std::map<std::string, std::tuple<int, int>> commandIDsMap) { _commandIDsMap = commandIDsMap; }
+	std::map<std::string, std::tuple<int, int>> GetCmdIDsMap() { return _commandIDsMap; }
 	int GetCommandIDFromName(std::string cmdName) {
-		return _commandIDsMap[cmdName];
+		return std::get<0>(_commandIDsMap[cmdName]);
 	}
 	std::string GetCommandNameFromID(int cmdID) {
 		for (const auto& keyval : _commandIDsMap)
 		{
-			if (keyval.second == cmdID)
+			if (std::get<0>(keyval.second) == cmdID)
 			{
 				return keyval.first;
 			}
@@ -132,7 +132,7 @@ private:
 	double _gradientClippingThreshold;
 
 	std::vector<std::vector<int>> _validationSet;
-	std::map<std::string, int> _commandIDsMap;
+	std::map<std::string, std::tuple<int, int>> _commandIDsMap;
 
 	//double _dropoutRate;
 

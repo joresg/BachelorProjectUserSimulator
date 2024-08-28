@@ -15,6 +15,7 @@
     <ClInclude Include="UserSimulator.h" />
     <ClInclude Include="CUDAMatrix.h" />
     <ClInclude Include="HyperParamGrid.h" />
+    <ClInclude Include="serialize_tuple.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
