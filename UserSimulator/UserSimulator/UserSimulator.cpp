@@ -189,7 +189,7 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	UserSimulator* bestModel = nullptr;
 	int allClasses;
-	bool trainModel = false;
+	bool trainModel = true;
 
 	std::ifstream file("user_simulator.dat");
 
@@ -214,9 +214,8 @@ int main() {
 		std::map<std::string, std::tuple<int, int>> commandIDsMap;
 		std::tuple<std::vector<std::vector<int>>, std::map<std::string, std::tuple<int, int>>> readFileRes;
 
-		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\YWDClickSeq.txt)";
-		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
-		const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\allSequences.txt)";
+		const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
+		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\allSequences.txt)";
 
 		allClasses = fileManager->AllClassesFromFile(filePath);
 		int inputNeurons = allClasses;
@@ -227,7 +226,7 @@ int main() {
 		double lastLR = 0;
 		bool lrWarmup = true;
 		bool useLRDecay = true;
-		int lrWarmupSteps = 50;
+		int lrWarmupSteps = 1000;
 		double lrWarmupStepIncrease = 0;
 		// learning rate, hidden units, seq length, batch size
 		for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
@@ -1193,6 +1192,8 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 				break;
 			}
 		}
+
+		if (_totalLoss != DBL_MAX) _totalLoss /= onehotEncodedInput.GetColumns();
 	}
 }
 

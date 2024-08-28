@@ -697,4 +697,14 @@ std::vector<CUDAMatrix> MathHandler::CreateBatchOneHotEncodedVector(std::vector<
 
     return oneHotEncodedClicks;
 }
+
+std::vector<CUDAMatrix> MathHandler::CreateClassesMask(std::vector<CUDAMatrix> oneHotEncodedVectors, int allClasses, int batchSize) {
+    std::vector<CUDAMatrix> oneHotEncodedClicksMask = oneHotEncodedVectors;
+
+    for (auto& oheVec : oneHotEncodedVectors) {
+
+    }
+
+    return oneHotEncodedClicksMask;
+}
 #pragma endregion

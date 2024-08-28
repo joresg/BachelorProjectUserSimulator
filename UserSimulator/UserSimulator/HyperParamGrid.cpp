@@ -3,9 +3,8 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
-	//_learningRate.push_back(0.1);
-	_learningRate.push_back(0.05);
-	_learningRate.push_back(0.01);
+	//_learningRate.push_back(0.05);
+	//_learningRate.push_back(0.01);
 	_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
 	_learningRate.push_back(0.00001);
@@ -70,13 +69,15 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	/*hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));*/
 
 	if (gatedCells == NoGates)
 	{
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);
 
-		_sequenceLength.push_back(5);
+		_sequenceLength.push_back(10);
 
 		/*_sequenceLength.push_back(10);
 		_sequenceLength.push_back(20);
@@ -93,7 +94,9 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 		_sequenceLength.push_back(100);
 	}
 
-	//_batchSize.push_back(512);
+	_batchSize.push_back(2048);
+	_batchSize.push_back(1024);
+	_batchSize.push_back(512);
 	_batchSize.push_back(256);
 	_batchSize.push_back(128);
 	_batchSize.push_back(64);
