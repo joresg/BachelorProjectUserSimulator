@@ -3,6 +3,8 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
+	//_learningRate.push_back(0.1);
+	_learningRate.push_back(0.05);
 	_learningRate.push_back(0.01);
 	_learningRate.push_back(0.001);
 	_learningRate.push_back(0.0001);
@@ -39,7 +41,7 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	LayerActivationFuncs tanhA = tanhAct;
 	LayerActivationFuncs leakyReLUA = leakyReLU;
 
-	hiddenNeuronsCombination4.push_back(std::make_tuple(hiddenNuronsCount3, leakyReLUA));
+	/*hiddenNeuronsCombination4.push_back(std::make_tuple(hiddenNuronsCount3, leakyReLUA));
 	hiddenNeuronsCombination4.push_back(std::make_tuple(hiddenNuronsCount2, leakyReLUA));
 	hiddenNeuronsCombination4.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
@@ -63,17 +65,22 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	hiddenNeuronsCombination12.push_back(std::make_tuple(hiddenNuronsCount3, leakyReLUA));
 	hiddenNeuronsCombination12.push_back(std::make_tuple(hiddenNuronsCount3, tanhA));
 
-	hiddenNeuronsCombination13.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
+	hiddenNeuronsCombination13.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));*/
+
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 
 	if (gatedCells == NoGates)
 	{
-		_hiddenUnits.push_back(hiddenNeuronsCombination13);
-		_hiddenUnits.push_back(hiddenNeuronsCombination9);
-		_hiddenUnits.push_back(hiddenNeuronsCombination4);
+		_hiddenUnits.push_back(hiddenNeuronsCombination1);
 
-		_sequenceLength.push_back(10);
+		_sequenceLength.push_back(5);
+
+		/*_sequenceLength.push_back(10);
 		_sequenceLength.push_back(20);
-		_sequenceLength.push_back(30);
+		_sequenceLength.push_back(30);*/
 	}
 	else {
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);
@@ -86,7 +93,7 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 		_sequenceLength.push_back(100);
 	}
 
-	_batchSize.push_back(512);
+	//_batchSize.push_back(512);
 	_batchSize.push_back(256);
 	_batchSize.push_back(128);
 	_batchSize.push_back(64);

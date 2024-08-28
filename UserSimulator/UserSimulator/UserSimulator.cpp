@@ -189,7 +189,18 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	UserSimulator* bestModel = nullptr;
 	int allClasses;
-	bool trainModel = false;
+	bool trainModel = true;
+
+	std::ifstream file("user_simulator.dat");
+
+	if (file) {
+		printf("existing model parameters found, loading model...\n");
+		bestModel = new UserSimulator();
+		std::ifstream ifs("user_simulator.dat");
+		boost::archive::text_iarchive ia(ifs);
+		ia >> bestModel;
+		allClasses = bestModel->GetAllClasses();
+	}
 
 	if (trainModel)
 	{
@@ -203,7 +214,8 @@ int main() {
 		std::tuple<std::vector<std::vector<int>>, std::map<std::string, int>> readFileRes;
 
 		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\YWDClickSeq.txt)";
-		const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
+		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
+		const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\allSequences.txt)";
 		std::map<std::string, int> commandIDsMap = fileManager->AllClassesFromFile(filePath);
 
 		allClasses = commandIDsMap.size();
@@ -214,7 +226,8 @@ int main() {
 		bool lastModelConverged = false;
 		double lastLR = 0;
 		bool lrWarmup = true;
-		int lrWarmupSteps = 1000;
+		bool useLRDecay = true;
+		int lrWarmupSteps = 500;
 		double lrWarmupStepIncrease = 0;
 		// learning rate, hidden units, seq length, batch size
 		for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
@@ -242,7 +255,7 @@ int main() {
 			int trainingSetSize = allSequencesFromFile.size() * 0.8;
 
 			// batch can't be too big, let it be relative to training set size
-			if (std::get<3>(paramCombo) > trainingSetSize / 32) continue;
+			if (std::get<3>(paramCombo) > trainingSetSize / 8) continue;
 
 			int validationSetSize = allSequencesFromFile.size() - trainingSetSize;
 
@@ -276,6 +289,7 @@ int main() {
 			double maxAccAchieved = DBL_MAX;
 			double desiredAcc = 0.9;
 			int progress = 1;
+			double minLR = lastLR * 0.1;
 
 			std::string hiddenNeuronsString = std::accumulate(std::get<1>(paramCombo).begin(), std::get<1>(paramCombo).end(), std::string{},
 				[](const std::string& acc, const std::tuple<int, LayerActivationFuncs>& elem) {
@@ -305,6 +319,10 @@ int main() {
 			printf("cross entropy for best model so far: %f\n", bestModel != nullptr ? bestModel->GetModelACcOnValidationData() : -1);
 
 			bool loweredLearningRate = false;
+			int loweredLearningRateEpoch = 0;
+
+			double lossBeforeTraining = userSimulator->EvaluateOnValidateSet();
+			printf("loss before training: %f\n", lossBeforeTraining);
 
 			while (true) {
 				progress = 1;
@@ -330,6 +348,7 @@ int main() {
 
 					userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true, false);
 					if (lrWarmup && userSimulator->GetLearningRate() < lastLR) userSimulator->SetLearningRate(userSimulator->GetLearningRate() + lrWarmupStepIncrease);
+					else lrWarmup = false;
 				}
 
 				userSimulator->SetBatchSize(batchSize);
@@ -342,33 +361,53 @@ int main() {
 
 					if (std::isinf(currentLoss) || currentLoss == DBL_MAX) break;
 					else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) {
-						printf("learning converged....\n");
-						lastModelConverged = true;
-						userSimulator->RestoreBestParameters();
-						userSimulator->SetModelAccOnValidationData(maxAccAchieved);
-						break;
+						if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5)
+						{
+							printf("learning converged....\n");
+
+							if (currentLoss < maxAccAchieved * 0.99)
+							{
+								lastModelConverged = true;
+								userSimulator->SetModelAccOnValidationData(currentLoss);
+								break;
+							}
+							else {
+								lastModelConverged = true;
+								userSimulator->RestoreBestParameters();
+								userSimulator->SetModelAccOnValidationData(maxAccAchieved);
+								break;
+							}
+						}
+						else if(!loweredLearningRate) {
+							printf("learning might be in local optimum, lowering lr....\n");
+							userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
+							loweredLearningRateEpoch = currentEpoch;
+							loweredLearningRate = true;
+						}
 					}
 					else if (currentLoss < maxAccAchieved * 0.99) {
 						maxAccAchieved = currentLoss;
 						maxAccEpoch = currentEpoch;
 						userSimulator->CopyParameters();
 					}
-					/*else if (currentLoss < maxAccAchieved - 0.05) {
+					else if (currentLoss > maxAccAchieved * 1.05) {
 						printf("model unstable, lowering lr\n");
 						userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
-					}*/
-					else if (currentLoss > maxAccAchieved + maxAccAchieved * 0.2) {
+					}
+					else if (currentLoss > maxAccAchieved * 1.2) {
 						printf("model deteriorated too much stopping training\n");
 						userSimulator->RestoreBestParameters();
 						break;
 					}
 				}
+				if (!lrWarmup && useLRDecay && userSimulator->GetLearningRate() > minLR) {
+					userSimulator->SetLearningRate(lastLR * std::exp(-0.05 * currentEpoch));
+				}
+
 				currentEpoch++;
 			}
 
-			userSimulator->SetModelAccOnValidationData(maxAccAchieved);
-
-			if (bestModel == nullptr || maxAccAchieved < bestModel->GetModelACcOnValidationData()) {
+			if (bestModel == nullptr || userSimulator->GetModelACcOnValidationData() < bestModel->GetModelACcOnValidationData()) {
 				bestModel = userSimulator;
 				SerializeModel(bestModel);
 			}
@@ -377,13 +416,13 @@ int main() {
 		printf("finished searching for optimal hpyerparameters\n");
 		//SerializeModel(bestModel);
 	}
-	else {
+	/*else {
 		bestModel = new UserSimulator();
 		std::ifstream ifs("user_simulator.dat");
 		boost::archive::text_iarchive ia(ifs);
 		ia >> bestModel;
 		allClasses = bestModel->GetAllClasses();
-	}
+	}*/
 
 	crow::SimpleApp app;
 
