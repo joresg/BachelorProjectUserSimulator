@@ -19,7 +19,7 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 }
 
 enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, LeakyReLUDerivative, SigmoidDerivative, None,
-DropoutMask};
+DropoutMask, Log};
 
 #pragma region CUDA kernels
 __device__ double atomicAddDouble(double* address, double val) {
@@ -71,6 +71,16 @@ __global__ void addColumnVectorToMatrix(double* matrix, double* vector, double* 
     // Check if the thread is within the bounds of the matrix
     if (row < m && col < n) {
         result[row * n + col] = matrix[row * n + col] + vector[row];
+    }
+}
+
+__global__ void multiplyColumnVectorAndMatrix(double* matrix, double* vector, double* result, int m, int n) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+    // Check if the thread is within the bounds of the matrix
+    if (row < m && col < n) {
+        result[row * n + col] = matrix[row * n + col] * vector[row];
     }
 }
 
@@ -159,6 +169,10 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
             double sigmoid = 1.0 / (1.0 + exp(-A[index]));
             C[index] = sigmoid * (1.0 - sigmoid);
         }
+        else if (op == Log) {
+            if (A[index] > 0) C[index] = std::log(A[index]);
+            else C[index] = 0;
+        }
     }
 }
 
@@ -209,6 +223,36 @@ void AddMatrixAndColumnVec(double* matrix, double* vector, double* res, int m, i
 
     // Launch the kernel
     addColumnVectorToMatrix << <gridSize, blockSize >> > (d_matrix, d_vector, d_result, m, n);
+
+    // Copy result from device to host
+    cudaMemcpy(res, d_result, m * n * sizeof(double), cudaMemcpyDeviceToHost);
+
+    // Free device memory
+    cudaFree(d_matrix);
+    cudaFree(d_vector);
+    cudaFree(d_result);
+}
+
+void MultiplyMatrixAndColumnVec(double* matrix, double* vector, double* res, int m, int n) {
+
+    // Device matrices
+    double* d_matrix, * d_vector, * d_result;
+
+    // Allocate device memory
+    cudaMalloc(&d_matrix, m * n * sizeof(double));
+    cudaMalloc(&d_vector, m * sizeof(double));
+    cudaMalloc(&d_result, m * n * sizeof(double));
+
+    // Copy data from host to device
+    cudaMemcpy(d_matrix, matrix, m * n * sizeof(double), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vector, vector, m * sizeof(double), cudaMemcpyHostToDevice);
+
+    // Define grid and block sizes
+    dim3 blockSize(16, 16);
+    dim3 gridSize((n + blockSize.x - 1) / blockSize.x, (m + blockSize.y - 1) / blockSize.y);
+
+    // Launch the kernel
+    multiplyColumnVectorAndMatrix << <gridSize, blockSize >> > (d_matrix, d_vector, d_result, m, n);
 
     // Copy result from device to host
     cudaMemcpy(res, d_result, m * n * sizeof(double), cudaMemcpyDeviceToHost);
@@ -410,6 +454,15 @@ CUDAMatrix applyExpToMatrix(CUDAMatrix* inputMatrix) {
     resMatrix.SetUnderlyingMatrix(matRes);
     return resMatrix;
 }
+
+CUDAMatrix applyLogToMatrix(CUDAMatrix* inputMatrix) {
+    MatrixOperation op = Log;
+    double* matRes = new double[inputMatrix->GetRows() * inputMatrix->GetColumns()];
+    matrixElementWiseOperations(inputMatrix->GetUnderlyingMatrix(), -1, matRes, inputMatrix->GetRows(), inputMatrix->GetColumns(), op);
+    CUDAMatrix resMatrix(inputMatrix->GetRows(), inputMatrix->GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+}
 #pragma endregion
 
 #pragma region public calls
@@ -429,6 +482,10 @@ CUDAMatrix CUDAMatrix::sigmoid() {
 
 CUDAMatrix CUDAMatrix::exp() {
     return applyExpToMatrix(this);
+}
+
+CUDAMatrix CUDAMatrix::log() {
+    return applyLogToMatrix(this);
 }
 
 CUDAMatrix CUDAMatrix::transpose() {
@@ -454,14 +511,21 @@ double CUDAMatrix::Norm() {
     return norm;
 }
 
-CUDAMatrix CUDAMatrix::ClipByNorm(double threshhold) {
+CUDAMatrix CUDAMatrix::ClipByNorm(double thresholdMin, double thresholdMax) {
     double matrixNorm = this->Norm();
-    if (matrixNorm > threshhold) {
-        double scalingFactor = threshhold / matrixNorm;
+    if (matrixNorm > thresholdMax) {
+        double scalingFactor = thresholdMax / matrixNorm;
+        return *this * scalingFactor;
+    }
+    else if (matrixNorm < thresholdMin) {
+        double scalingFactor = thresholdMin / matrixNorm;
         return *this * scalingFactor;
     }
     else return *this;
+}
 
+CUDAMatrix CUDAMatrix::ApplyMask(CUDAMatrix mask) {
+    return *this * mask.Array();
 }
 #pragma endregion
 
@@ -535,23 +599,28 @@ CUDAMatrix CUDAMatrix::operator*(const CUDAMatrix& mat2) const {
     if ((this->_arrayForm || mat2._arrayForm) && this->GetRows() != mat2.GetRows() && this->GetColumns() != mat2.GetColumns()) {
         throw std::invalid_argument("matrix multiplication in array form dimensions incorrect!");
     }
-
-    if (!this->_arrayForm && !mat2._arrayForm && this->GetColumns() != mat2.GetRows()) {
+    else if (!this->_arrayForm && !this->_vectorForm &&  mat2._vectorForm && mat2._rows != this->_rows) {
+        throw std::invalid_argument("matrix multiplication in vec form dimensions incorrect!");
+    }
+    else if (!this->_arrayForm && !mat2._arrayForm && !mat2._vectorForm && this->GetColumns() != mat2.GetRows()) {
         throw std::invalid_argument("matrix multiplication dimensions incorrect!");
     }
 
     MatrixOperation op = Multiply;
-    double* matRes = new double[this->GetRows() * mat2.GetColumns()];
+    double* matRes = new double[this->GetRows() * (!mat2._vectorForm ? mat2.GetColumns() : this->GetColumns())];
 
     if (this->_arrayForm || mat2._arrayForm) {
         matrixElementWiseOperations(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), mat2.GetColumns(), op);
+    }
+    else if (!this->_arrayForm && !this->_vectorForm && mat2._vectorForm) {
+        MultiplyMatrixAndColumnVec(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), this->GetColumns());
     }
     else {
         //matrixMultiply(*this, mat2, matRes);
         matrixMultiply(this->GetUnderlyingMatrix(), mat2.GetUnderlyingMatrix(), matRes, this->GetRows(), this->GetColumns(), mat2.GetRows(), mat2.GetColumns(), op);
     }
 
-    CUDAMatrix resMatrix(this->GetRows(), mat2.GetColumns());
+    CUDAMatrix resMatrix(this->GetRows(), !mat2._vectorForm ? mat2.GetColumns() : this->GetColumns());
     resMatrix.SetUnderlyingMatrix(matRes);
     return resMatrix;
 
@@ -671,9 +740,10 @@ std::vector<CUDAMatrix> MathHandler::CreateOneHotEncodedVectorSequence(std::vect
     return oneHotEncodedClicks;
 }
 
-std::vector<CUDAMatrix> MathHandler::CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, int allClasses, int batchSize) {
+std::tuple<std::vector<CUDAMatrix>, std::vector<CUDAMatrix>> MathHandler::CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, CUDAMatrix classMasks, int allClasses, int batchSize) {
 
     std::vector<CUDAMatrix> oneHotEncodedClicks;
+    std::vector<CUDAMatrix> oneHotEncodedClicksMask;
 
     std::queue<int> randomOrder;
 
@@ -684,18 +754,21 @@ std::vector<CUDAMatrix> MathHandler::CreateBatchOneHotEncodedVector(std::vector<
     for (int i = 0; i < seqLength; i++)
     {
         CUDAMatrix oneHotEncodedLabel = CUDAMatrix::Zero(allClasses, batchSize);
+        CUDAMatrix oneHotEncodedLabelMask = CUDAMatrix::Zero(allClasses, batchSize);
 
         for (int j = 0; j < batchSize; j++) {
             oneHotEncodedLabel(cmdIDs[j][i], j) = 1.0;
+            oneHotEncodedLabelMask(cmdIDs[j][i], j) = classMasks(cmdIDs[j][i], 0);
         }
         oneHotEncodedClicks.push_back(oneHotEncodedLabel);
+        oneHotEncodedClicksMask.push_back(oneHotEncodedLabelMask);
     }
 
     /*for (int i = 0; i < 5; i++) {
         oneHotEncodedClicks[i].Print();
     }*/
 
-    return oneHotEncodedClicks;
+    return std::make_tuple(oneHotEncodedClicks, oneHotEncodedClicksMask);
 }
 
 std::vector<CUDAMatrix> MathHandler::CreateClassesMask(std::vector<CUDAMatrix> oneHotEncodedVectors, int allClasses, int batchSize) {

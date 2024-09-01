@@ -12,6 +12,7 @@
 #include <boost/serialization/string.hpp>
 #include <boost/serialization/unique_ptr.hpp>
 #include <boost/serialization/shared_ptr.hpp>
+#include <tuple>
 
 #pragma once
 class UserSimulator
@@ -19,10 +20,12 @@ class UserSimulator
 public:
 	UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
 	UserSimulator();
-	double EvaluateOnValidateSet();
-	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels, bool performBackProp, bool verboseMode, bool trainMode, bool validationMode, int selectNTopClasses = 1);
+	double EvaluateOnValidateSet(int lossType);
+	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels,
+		bool performBackProp, bool verboseMode, bool trainMode, bool validationMode, int selectNTopClasses = 1);
 	std::vector<std::vector<int>> PredictAllSequencesFromSequence(std::vector<int> startingSequence, int seqLen);
-	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, CUDAMatrix* nextAction = nullptr);
+	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, 
+		bool forwardDirection, CUDAMatrix* nextAction = nullptr);
 	void BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
 	void ForwardPropGated(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
 	void BackPropGated(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
@@ -72,8 +75,12 @@ public:
 	}
 	int GetAllClasses() { return _allClasses; }
 	void SetAllClasses(int allClasses) { _allClasses = allClasses; }
-	double GetGradientClippingThreshold() { return _gradientClippingThreshold; }
-	void SetGradientClippingThreshold(double gradientClippingThreshold) { _gradientClippingThreshold = gradientClippingThreshold; }
+	double GetGradientClippingThreshold() { return _gradientClippingThresholdMax; }
+	void SetGradientClippingThreshold(double gradientClippingThreshold) { _gradientClippingThresholdMax = gradientClippingThreshold; }
+	int GetTotalNumberOfSamples() { return _totalNumberOfSamples; }
+	void SetTotalNumberOfSamples(int numOfSamples) { _totalNumberOfSamples = numOfSamples; }
+	CUDAMatrix GetWeightsForClasses() { return _weightsForClasses; }
+	void SetWeightsForClasses(CUDAMatrix classWeights) { _weightsForClasses = classWeights; }
 
 private:
 	friend class boost::serialization::access;
@@ -81,16 +88,28 @@ private:
 	MathHandler* _mathHandler;
 	GatedUnits _gatedUnits;
 	std::vector<CUDAMatrix> _inputWeights;
+	std::vector<CUDAMatrix> _inputWeightsBack;
 	std::vector<CUDAMatrix> _hiddenWeights;
+	std::vector<CUDAMatrix> _hiddenWeightsBack;
 	CUDAMatrix _weightsOutput;
+	CUDAMatrix _weightsOutputBack;
 	std::vector<CUDAMatrix> _biasesHidden;
+	std::vector<CUDAMatrix> _biasesHiddenBack;
 	std::vector<CUDAMatrix> _biasesRecurrentHidden;
+	std::vector<CUDAMatrix> _biasesRecurrentHiddenBack;
 	CUDAMatrix _biasesOutput;
+	CUDAMatrix _biasesOutputBack;
+	CUDAMatrix _weightsForClasses;
 
 	std::vector<CUDAMatrix> _velocityWeightsInput;
 	std::vector<CUDAMatrix> _velocityWeightsHidden;
 	std::vector<CUDAMatrix> _velocityBias;
 	std::vector<CUDAMatrix> _velocityRecurrentHiddenBias;
+
+	std::vector<CUDAMatrix> _velocityWeightsInputBack;
+	std::vector<CUDAMatrix> _velocityWeightsHiddenBack;
+	std::vector<CUDAMatrix> _velocityBiasBack;
+	std::vector<CUDAMatrix> _velocityRecurrentHiddenBiasBack;
 
 	std::vector<CUDAMatrix> _updateGateInput;
 	std::vector<CUDAMatrix> _updateGateHidden;
@@ -110,13 +129,19 @@ private:
 	CUDAMatrix _biasesOutputCopy;
 
 	std::vector<std::vector<CUDAMatrix>> _hiddenStepValues;
+	std::vector<std::vector<CUDAMatrix>> _hiddenStepValuesBack;
+	std::vector<CUDAMatrix> _hiddenStepValuesCombined;
 	std::vector<std::vector<CUDAMatrix>> _resetGateValues;
 	std::vector<std::vector<CUDAMatrix>> _updateGateValues;
 	std::vector<std::vector<CUDAMatrix>> _candidateActivationValues;
+	std::vector<CUDAMatrix> _outputValuesCombined;
 	std::vector<CUDAMatrix> _outputValues;
+	std::vector<CUDAMatrix> _outputValuesBack;
 	std::vector<CUDAMatrix> _oneHotEncodedClicks;
+	std::vector<CUDAMatrix> _oneHotEncodedClicksReversed;
 
 	double _totalLoss;
+	double _totalLossGeneral;
 
 	int _inputNeurons;
 	std::vector<int> _hiddenLayerNeurons;
@@ -129,10 +154,12 @@ private:
 	double _modelAccuracy;
 	int _trainingSeqLength;
 	double _momentumCoefficient;
-	double _gradientClippingThreshold;
+	double _gradientClippingThresholdMin;
+	double _gradientClippingThresholdMax;
 
 	std::vector<std::vector<int>> _validationSet;
 	std::map<std::string, std::tuple<int, int>> _commandIDsMap;
+	int _totalNumberOfSamples;
 
 	//double _dropoutRate;
 
@@ -161,6 +188,7 @@ private:
 		ar& _trainingSeqLength;
 		ar& _momentumCoefficient;
 		ar& _commandIDsMap;
+		ar& _totalNumberOfSamples;
 		//ar& _dropoutRate;
 	}
 };

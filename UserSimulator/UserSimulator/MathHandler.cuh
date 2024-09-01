@@ -10,6 +10,7 @@
 #include <queue>
 #include <chrono>
 #include <vector>
+#include <tuple>
 
 #pragma once
 class MathHandler {
@@ -21,7 +22,7 @@ public:
 	CUDAMatrix ActFuncDerivative(CUDAMatrix inputMatrix, LayerActivationFuncs actFunc);
 	std::default_random_engine GetRandomEngine() { return _re; }
 	std::vector<CUDAMatrix> CreateOneHotEncodedVectorSequence(std::vector<int> cmdIDs, int allClasses);
-	std::vector<CUDAMatrix> CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, int allClasses, int batchSize);
+	std::tuple<std::vector<CUDAMatrix>, std::vector<CUDAMatrix>> CreateBatchOneHotEncodedVector(std::vector<std::vector<int>> cmdIDs, CUDAMatrix classMasks, int allClasses, int batchSize);
 	std::vector<CUDAMatrix> CreateClassesMask(std::vector<CUDAMatrix> oneHotEncodedVectors, int allClasses, int batchSize);
 	CUDAMatrix CreateOneHotEncodedVector(int cmdID, int allClasses);
 	int OneHotEncodedVectorToClassID(CUDAMatrix oheInput);

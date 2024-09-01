@@ -56,14 +56,16 @@ public:
 	CUDAMatrix(const CUDAMatrix& other);
 
 	CUDAMatrix Activate(LayerActivationFuncs fn);
+	CUDAMatrix ApplyMask(CUDAMatrix mask);
 	CUDAMatrix tanh();
 	CUDAMatrix sigmoid();
 	CUDAMatrix exp();
+	CUDAMatrix log();
 	CUDAMatrix transpose();
 	CUDAMatrix RowAverage();
 	// Frobenius norm for gradient clipping
 	double Norm();
-	CUDAMatrix ClipByNorm(double threshhold);
+	CUDAMatrix ClipByNorm(double thresholdMin, double thresholdMax);
 
 	int GetRows() const { return _rows; }
 	int GetColumns() const { return _cols; }

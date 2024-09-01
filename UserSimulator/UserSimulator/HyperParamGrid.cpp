@@ -3,11 +3,13 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
-	//_learningRate.push_back(0.05);
-	//_learningRate.push_back(0.01);
+	//_learningRate.push_back(0.1);
+	_learningRate.push_back(0.05);
+	_learningRate.push_back(0.01);
+	_learningRate.push_back(0.005);
 	_learningRate.push_back(0.001);
-	_learningRate.push_back(0.0001);
-	_learningRate.push_back(0.00001);
+	//_learningRate.push_back(0.0001);
+	//_learningRate.push_back(0.00001);
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination1;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination2;
@@ -66,17 +68,26 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 
 	hiddenNeuronsCombination13.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));*/
 
+	hiddenNeuronsCombination2.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
+
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
-	/*hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
 	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
-	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));*/
+
+	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
+	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+
 
 	if (gatedCells == NoGates)
 	{
+		//_hiddenUnits.push_back(hiddenNeuronsCombination1);
+		//_hiddenUnits.push_back(hiddenNeuronsCombination2);
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);
 
+		//_sequenceLength.push_back(5);
 		_sequenceLength.push_back(10);
 
 		/*_sequenceLength.push_back(10);
