@@ -3,11 +3,10 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
-	//_learningRate.push_back(0.1);
 	_learningRate.push_back(0.05);
 	_learningRate.push_back(0.01);
-	_learningRate.push_back(0.005);
-	_learningRate.push_back(0.001);
+	//_learningRate.push_back(0.005);
+	//_learningRate.push_back(0.001);
 	//_learningRate.push_back(0.0001);
 	//_learningRate.push_back(0.00001);
 
@@ -83,11 +82,10 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 
 	if (gatedCells == NoGates)
 	{
-		//_hiddenUnits.push_back(hiddenNeuronsCombination1);
-		//_hiddenUnits.push_back(hiddenNeuronsCombination2);
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);
+		_hiddenUnits.push_back(hiddenNeuronsCombination2);
 
-		//_sequenceLength.push_back(5);
+		_sequenceLength.push_back(5);
 		_sequenceLength.push_back(10);
 
 		/*_sequenceLength.push_back(10);

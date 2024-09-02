@@ -25,7 +25,7 @@ public:
 		bool performBackProp, bool verboseMode, bool trainMode, bool validationMode, int selectNTopClasses = 1);
 	std::vector<std::vector<int>> PredictAllSequencesFromSequence(std::vector<int> startingSequence, int seqLen);
 	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, 
-		bool forwardDirection, CUDAMatrix* nextAction = nullptr);
+		bool forwardDirection, int fullSeqLength, CUDAMatrix* nextAction = nullptr);
 	void BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
 	void ForwardPropGated(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
 	void BackPropGated(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
@@ -122,10 +122,14 @@ private:
 	std::vector<CUDAMatrix> _candidateActivationBias;
 
 	std::vector<CUDAMatrix> _inputWeightsCopy;
+	std::vector<CUDAMatrix> _inputWeightsCopyBack;
 	std::vector<CUDAMatrix> _hiddenWeightsCopy;
+	std::vector<CUDAMatrix> _hiddenWeightsCopyBack;
 	CUDAMatrix _weightsOutputCopy;
 	std::vector<CUDAMatrix> _biasesHiddenCopy;
+	std::vector<CUDAMatrix> _biasesHiddenCopyBack;
 	std::vector<CUDAMatrix> _biasesRecurrentHiddenCopy;
+	std::vector<CUDAMatrix> _biasesRecurrentHiddenCopyBack;
 	CUDAMatrix _biasesOutputCopy;
 
 	std::vector<std::vector<CUDAMatrix>> _hiddenStepValues;
@@ -167,10 +171,14 @@ private:
 	void serialize(Archive& ar, const unsigned int version) {
 		ar& _gatedUnits;
 		ar& _inputWeights;
+		ar& _inputWeightsBack;
 		ar& _hiddenWeights;
+		ar& _hiddenWeightsBack;
 		ar& _weightsOutput;
 		ar& _biasesHidden;
+		ar& _biasesHiddenBack;
 		ar& _biasesRecurrentHidden;
+		ar& _biasesRecurrentHiddenBack;
 		ar& _biasesOutput;
 		ar& _velocityWeightsInput;
 		ar& _velocityWeightsHidden;

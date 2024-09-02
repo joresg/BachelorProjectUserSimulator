@@ -192,7 +192,7 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	UserSimulator* bestModel = nullptr;
 	int allClasses;
-	bool trainModel = true;
+	bool trainModel = false;
 
 	std::ifstream file("user_simulator.dat");
 
@@ -229,7 +229,7 @@ int main() {
 		double lastLR = 0;
 		bool lrWarmup = true;
 		bool useLRDecay = true;
-		int lrWarmupSteps = 100;
+		int lrWarmupSteps = 500;
 		double lrWarmupStepIncrease = 0;
 		// learning rate, hidden units, seq length, batch size
 		for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
@@ -291,7 +291,7 @@ int main() {
 			//classWeights.Print();
 
 			double shiftLow = 1;
-			double shiftHigh = 3;
+			double shiftHigh = 2;
 
 			// normalize between shiftLow and shiftHigh
 			for (int i = 0; i < classWeights.GetRows(); i++) {
@@ -526,7 +526,7 @@ int main() {
 				{
 					double currentLoss = userSimulator->EvaluateOnValidateSet(0);
 
-					if (std::isinf(currentLoss) || currentLoss == DBL_MAX || currentLoss < 0.4) {
+					if (std::isinf(currentLoss) || currentLoss == DBL_MAX) {
 						printf("error\n");
 						if (maxAccAchieved < currentLoss) {
 							userSimulator->RestoreBestParameters();
@@ -538,8 +538,8 @@ int main() {
 						}
 						break;
 					}
-					else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) {
-						if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5)
+					else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5 || currentLoss <= 0.2 || currentEpoch > 40) {
+						if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5 || currentLoss <= 0.2 || currentEpoch > 40)
 						{
 							printf("learning converged....\n");
 
@@ -1319,7 +1319,7 @@ void UserSimulator::BackPropGated(std::vector<CUDAMatrix> oneHotEncodedLabels, d
 	}
 }
 
-void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, bool forwardDirection, CUDAMatrix* nextAction) {
+void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, bool forwardDirection, int fullSeqLength, CUDAMatrix* nextAction) {
 	std::vector<CUDAMatrix> allHiddenLayers;
 	CUDAMatrix XI;
 	CUDAMatrix XHCurrentTimeStep;
@@ -1348,7 +1348,7 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 			}
 		}
 		else {
-			if (sequencePosition == _trainingSeqLength - 1) {
+			if (sequencePosition == fullSeqLength - 1) {
 				XHCurrentTimeStep = XI;
 			}
 			else {
@@ -1485,10 +1485,13 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		inputWeightsGradBack[i] = CUDAMatrix::Zero(_inputWeights[i].GetRows(), _inputWeights[i].GetColumns());
 	}
 
+	// hiddenGrad = (_weightsOutput.transpose() * outputGrad) * _mathHandler->ActFuncDerivative(_hiddenStepValues[t][layer], _hiddenLayerNeuronsActivationFuncs[layer]).Array();
+
 	// Iterate over each timestep from last to first
 	for (int t = _outputValuesCombined.size() - 1; t >= 0; t--) {
 		// Cross-entropy loss gradient w.r.t. softmax input
 		CUDAMatrix outputGrad = _outputValuesCombined[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
+		//CUDAMatrix outputGrad = _outputValuesCombined[t] - (oneHotEncodedLabels[t + 1] * _weightsForClasses.Vec()); // Gradient of softmax + cross-entropy
 
 		// Gradients for the output layer
 		outputWeightsGrad += outputGrad * _mathHandler->TransposeMatrix(_hiddenStepValuesCombined[t]);
@@ -1496,7 +1499,7 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 
 		// Backpropagate into the hidden layers
 
-		CUDAMatrix concatenatedHiddenGrad = _weightsOutput.transpose() * outputGrad;
+		CUDAMatrix concatenatedHiddenGrad = _weightsOutput.transpose() * outputGrad * _mathHandler->ActFuncDerivative(_hiddenStepValuesCombined.back(), _hiddenLayerNeuronsActivationFuncs.back()).Array();
 
 		CUDAMatrix hiddenGradForward(concatenatedHiddenGrad.GetRows() / 2, _batchSize);
 		CUDAMatrix hiddenGradBackward(concatenatedHiddenGrad.GetRows() / 2, _batchSize);
@@ -1545,17 +1548,16 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		}
 	}
 
-	//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 
 	for (int i = 0; i < _hiddenWeights.size(); i++) {
 		nextHiddenGrad[i] = CUDAMatrix::Zero(_hiddenLayerNeurons[i], this->_batchSize);
 	}
 
 
-	for (int t = 1; t < _outputValuesCombined.size() - 1; t++) {
+	for (int t = 0; t < _outputValuesCombined.size() - 1; t++) {
 		// Cross-entropy loss gradient w.r.t. softmax input
 		CUDAMatrix outputGrad = _outputValuesCombined[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
+		//CUDAMatrix outputGrad = _outputValuesCombined[t] - (oneHotEncodedLabels[t + 1] * _weightsForClasses.Vec()); // Gradient of softmax + cross-entropy
 
 		// Gradients for the output layer
 		outputWeightsGrad += outputGrad * _mathHandler->TransposeMatrix(_hiddenStepValuesCombined[t]);
@@ -1563,7 +1565,8 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 
 		// Backpropagate into the hidden layers
 
-		CUDAMatrix concatenatedHiddenGrad = _weightsOutput.transpose() * outputGrad;
+		CUDAMatrix concatenatedHiddenGrad = _weightsOutput.transpose() * outputGrad * _mathHandler->ActFuncDerivative(_hiddenStepValuesCombined.back(), _hiddenLayerNeuronsActivationFuncs.back()).Array();
+		//CUDAMatrix concatenatedHiddenGrad = _weightsOutput.transpose() * outputGrad;
 
 		CUDAMatrix hiddenGradForward(concatenatedHiddenGrad.GetRows() / 2, _batchSize);
 		CUDAMatrix hiddenGradBackward(concatenatedHiddenGrad.GetRows() / 2, _batchSize);
@@ -1607,8 +1610,6 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	}
 
 
-	//-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 	// Apply learning rate adjustment
 	// smaller batches square root scaling, larger batches linear scaling
 	double adjustedLearningRate = learningRate;
@@ -1639,10 +1640,10 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	outputWeightsGrad.ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
 	outputBiasGrad.ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
 
-	for (int i = 0; i < inputWeightsGrad.size(); i++) inputWeightsGrad[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
-	for (int i = 0; i < hiddenWeightsGrad.size(); i++) hiddenWeightsGrad[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
-	for (int i = 0; i < hiddenBiasGrad.size(); i++) hiddenBiasGrad[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
-	for (int i = 0; i < hiddenRecurrentBiasGrad.size(); i++) hiddenRecurrentBiasGrad[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
+	for (int i = 0; i < inputWeightsGradBack.size(); i++) inputWeightsGradBack[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
+	for (int i = 0; i < hiddenWeightsGradBack.size(); i++) hiddenWeightsGradBack[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
+	for (int i = 0; i < hiddenBiasGradBack.size(); i++) hiddenBiasGradBack[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
+	for (int i = 0; i < hiddenRecurrentBiasGradBack.size(); i++) hiddenRecurrentBiasGradBack[i].ClipByNorm(_gradientClippingThresholdMin, _gradientClippingThresholdMax);
 
 	// update model parameters
 
@@ -1663,6 +1664,10 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 		_velocityWeightsHiddenBack[i] = (_velocityWeightsHiddenBack[i] * _momentumCoefficient) + (hiddenWeightsGradBack[i] * (1 - _momentumCoefficient));
 		_velocityBiasBack[i] = (_velocityBiasBack[i] * _momentumCoefficient) + (hiddenBiasGradBack[i] * (1 - _momentumCoefficient));
 		_velocityRecurrentHiddenBiasBack[i] = (_velocityRecurrentHiddenBiasBack[i] * _momentumCoefficient) + (hiddenRecurrentBiasGradBack[i] * (1 - _momentumCoefficient));
+
+		_hiddenWeights[i] -= _velocityWeightsHidden[i] * adjustedLearningRate;
+		_biasesHidden[i] -= _velocityBias[i] * adjustedLearningRate;
+		_biasesRecurrentHidden[i] -= _velocityRecurrentHiddenBias[i] * adjustedLearningRate;
 
 		_hiddenWeightsBack[i] -= _velocityWeightsHiddenBack[i] * adjustedLearningRate;
 		_biasesHiddenBack[i] -= _velocityBiasBack[i] * adjustedLearningRate;
@@ -1755,8 +1760,8 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 		if (_gatedUnits == NoGates) {
 			// bidirectional compute values for forward and backward direction si
-			ForwardProp(onehotEncodedLabels[i], i, verboseMode, trainMode, validationMode, true, validationMode ? &onehotEncodedLabels[i + 1] : nullptr);
-			ForwardProp(onehotEncodedLabelsReversed[i], onehotEncodedLabels.size() - 1 - i, verboseMode, trainMode, validationMode, false, validationMode ? &onehotEncodedLabelsReversed[i + 1] : nullptr);
+			ForwardProp(onehotEncodedLabels[i], i, verboseMode, trainMode, validationMode, true, onehotEncodedLabels.size() - (performBackProp || validationMode ? 1 : 0), validationMode ? &onehotEncodedLabels[i + 1] : nullptr);
+			ForwardProp(onehotEncodedLabelsReversed[i], onehotEncodedLabels.size() - 1 - i, verboseMode, trainMode, validationMode, false, onehotEncodedLabels.size(), validationMode ? &onehotEncodedLabelsReversed[i + 1] : nullptr);
 		}
 		else if (_gatedUnits == GRU) ForwardPropGated(onehotEncodedLabels[i], i, verboseMode, trainMode);
 	}
@@ -1768,8 +1773,8 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 	for (int i = 0; i < _hiddenStepValues.size(); i++) {
 		//_outputValuesCombined[i] += _outputValuesBack[_outputValues.size() - i - 1];
-		CUDAMatrix hiddenStateCombined(_hiddenStepValues[i].back().GetRows() * 2, _batchSize);
-		for (int k = 0; k < _batchSize; k++)
+		CUDAMatrix hiddenStateCombined(_hiddenStepValues[i].back().GetRows() * 2, _hiddenStepValues[i].back().GetColumns());
+		for (int k = 0; k < _hiddenStepValues[i].back().GetColumns(); k++)
 		{
 			for (int j = 0; j < _hiddenStepValues[i].back().GetRows(); j++) {
 				hiddenStateCombined(j, k) = _hiddenStepValues[i].back()(j, k);
@@ -1801,54 +1806,57 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 		_outputValuesCombined.push_back(outputValuesActivated);
 
-		// calculate cross entropy loss
+		if (validationMode)
+		{
+			// calculate cross entropy loss
 
-		bool predictionFound = false;
+			bool predictionFound = false;
 
-		CUDAMatrix outputValuesWithNextActions = outputValuesActivated * onehotEncodedLabels[i + 1].Array();
+			CUDAMatrix outputValuesWithNextActions = outputValuesActivated * onehotEncodedLabels[i + 1].Array();
 
-		for (int j = 0; j < outputValuesWithNextActions.GetColumns(); j++) {
-			predictionFound = false;
-			for (int i = 0; i < outputValuesWithNextActions.GetRows(); i++) {
-				if (outputValuesWithNextActions(i, j) > 0) {
-					totalLossGeneralTimestep -= std::log(outputValuesWithNextActions(i, j));
-					predictionFound = true;
-					continue;
+			for (int j = 0; j < outputValuesWithNextActions.GetColumns(); j++) {
+				predictionFound = false;
+				for (int i = 0; i < outputValuesWithNextActions.GetRows(); i++) {
+					if (outputValuesWithNextActions(i, j) > 0) {
+						totalLossGeneralTimestep -= std::log(outputValuesWithNextActions(i, j));
+						predictionFound = true;
+						continue;
+					}
+				}
+				if (!predictionFound) {
+					totalLossGeneralTimestep = DBL_MAX;
+					//break;
 				}
 			}
-			if (!predictionFound) {
-				totalLossGeneralTimestep = DBL_MAX;
-				//break;
-			}
-		}
 
-		//if (_totalLossGeneral != DBL_MAX) _totalLossGeneral /= onehotEncodedInput.GetColumns();
-		if (totalLossGeneralTimestep != DBL_MAX) _totalLossGeneral += totalLossGeneralTimestep / onehotEncodedLabels[i].GetColumns();
-		else _totalLossGeneral = DBL_MAX;
+			//if (_totalLossGeneral != DBL_MAX) _totalLossGeneral /= onehotEncodedInput.GetColumns();
+			if (totalLossGeneralTimestep != DBL_MAX) _totalLossGeneral += totalLossGeneralTimestep / onehotEncodedLabels[i].GetColumns();
+			else _totalLossGeneral = DBL_MAX;
 
 
-		predictionFound = false;
-
-		CUDAMatrix outputValuesMaskedWithNextActions = ((outputValuesActivated * onehotEncodedLabels[i + 1].Array())).log() * _weightsForClasses.Vec();
-
-		for (int j = 0; j < outputValuesMaskedWithNextActions.GetColumns(); j++) {
 			predictionFound = false;
-			for (int i = 0; i < outputValuesMaskedWithNextActions.GetRows(); i++) {
-				if (outputValuesMaskedWithNextActions(i, j) < 0) {
-					//_totalLoss -= std::log(outputValuesMaskedWithNextActions(i, j));
-					totalLossTimestep -= outputValuesMaskedWithNextActions(i, j);
-					predictionFound = true;
-					continue;
+
+			CUDAMatrix outputValuesMaskedWithNextActions = ((outputValuesActivated * onehotEncodedLabels[i + 1].Array())).log() * _weightsForClasses.Vec();
+
+			for (int j = 0; j < outputValuesMaskedWithNextActions.GetColumns(); j++) {
+				predictionFound = false;
+				for (int i = 0; i < outputValuesMaskedWithNextActions.GetRows(); i++) {
+					if (outputValuesMaskedWithNextActions(i, j) < 0) {
+						//_totalLoss -= std::log(outputValuesMaskedWithNextActions(i, j));
+						totalLossTimestep -= outputValuesMaskedWithNextActions(i, j);
+						predictionFound = true;
+						continue;
+					}
+				}
+				if (!predictionFound) {
+					totalLossTimestep = DBL_MAX;
+					//break;
 				}
 			}
-			if (!predictionFound) {
-				totalLossTimestep = DBL_MAX;
-				//break;
-			}
-		}
 
-		if (totalLossTimestep != DBL_MAX) _totalLoss += totalLossTimestep / onehotEncodedLabels[i].GetColumns();
-		else _totalLoss = DBL_MAX;
+			if (totalLossTimestep != DBL_MAX) _totalLoss += totalLossTimestep / onehotEncodedLabels[i].GetColumns();
+			else _totalLoss = DBL_MAX;
+		}
 
 		//_outputValues[i].Print();
 		//_outputValuesBack[i].Print();
@@ -1961,18 +1969,26 @@ void UserSimulator::PrintPredictedClassProbabilities() {
 
 void UserSimulator::CopyParameters() {
 	_inputWeightsCopy = _inputWeights;
+	_inputWeightsCopyBack = _inputWeightsBack;
 	_hiddenWeightsCopy = _hiddenWeights;
+	_hiddenWeightsCopyBack = _hiddenWeightsBack;
 	_weightsOutputCopy = _weightsOutput;
 	_biasesHiddenCopy = _biasesHidden;
+	_biasesHiddenCopyBack = _biasesHiddenBack;
 	_biasesRecurrentHiddenCopy = _biasesRecurrentHidden;
+	_biasesRecurrentHiddenCopyBack = _biasesRecurrentHiddenBack;
 	_biasesOutputCopy = _biasesOutput;
 }
 
 void UserSimulator::RestoreBestParameters() {
 	_inputWeights = _inputWeightsCopy;
+	_inputWeightsBack = _inputWeightsCopyBack;
 	_hiddenWeights = _hiddenWeightsCopy;
+	_hiddenWeightsBack = _hiddenWeightsCopyBack;
 	_weightsOutput = _weightsOutputCopy;
 	_biasesHidden = _biasesHiddenCopy;
+	_biasesHiddenBack = _biasesHiddenCopyBack;
 	_biasesRecurrentHidden = _biasesRecurrentHiddenCopy;
+	_biasesRecurrentHiddenBack = _biasesRecurrentHiddenCopyBack;
 	_biasesOutput = _biasesOutputCopy;
 }
