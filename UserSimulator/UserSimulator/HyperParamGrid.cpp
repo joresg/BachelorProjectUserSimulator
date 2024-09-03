@@ -5,10 +5,8 @@
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	_learningRate.push_back(0.05);
 	_learningRate.push_back(0.01);
-	//_learningRate.push_back(0.005);
-	//_learningRate.push_back(0.001);
-	//_learningRate.push_back(0.0001);
-	//_learningRate.push_back(0.00001);
+	_learningRate.push_back(0.005);
+	_learningRate.push_back(0.001);
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination1;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination2;

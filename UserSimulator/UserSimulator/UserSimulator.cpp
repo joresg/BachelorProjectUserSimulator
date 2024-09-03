@@ -192,7 +192,7 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	UserSimulator* bestModel = nullptr;
 	int allClasses;
-	bool trainModel = false;
+	bool trainModel = true;
 
 	std::ifstream file("user_simulator.dat");
 
@@ -288,10 +288,8 @@ int main() {
 				else if (classWeights(i, 0) < classWeightsMin) classWeightsMin = classWeights(i, 0);
 			}
 
-			//classWeights.Print();
-
-			double shiftLow = 1;
-			double shiftHigh = 2;
+			double shiftLow = 1.0;
+			double shiftHigh = 2.0;
 
 			// normalize between shiftLow and shiftHigh
 			for (int i = 0; i < classWeights.GetRows(); i++) {
@@ -538,8 +536,8 @@ int main() {
 						}
 						break;
 					}
-					else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5 || currentLoss <= 0.2 || currentEpoch > 40) {
-						if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5 || currentLoss <= 0.2 || currentEpoch > 40)
+					else if ((currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) || currentLoss <= 0.2 || currentEpoch > 40) {
+						if ((loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5) || currentLoss <= 0.2 || currentEpoch > 40)
 						{
 							printf("learning converged....\n");
 
@@ -645,7 +643,7 @@ UserSimulator::UserSimulator(){
 UserSimulator::UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : 
 	_weightsOutput(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]) * 2), _weightsOutputBack(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1])),
 	_batchSize(batchSize), _allTrainingExamplesCount(-1), _gradientClippingThresholdMax(10),
-	_gradientClippingThresholdMin(4), _totalNumberOfSamples(-1), _modelAccuracy(DBL_MAX) {
+	_gradientClippingThresholdMin(4), _totalNumberOfSamples(-1), _modelAccuracy(DBL_MAX), _dropoutRate(0.2) {
 
 	_gatedUnits = NoGates;
 
@@ -1344,7 +1342,8 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 				//XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]);
 
 				//seperate bias for recurrent connection
-				XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]) + _biasesRecurrentHidden[l].Vec();
+				if (trainMode) XHCurrentTimeStep = XI + (_hiddenWeights[l] * (_hiddenStepValues[sequencePosition - 1][l] * _recurrentMasks[l].Array())) + _biasesRecurrentHidden[l].Vec();
+				else XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]) + _biasesRecurrentHidden[l].Vec();
 			}
 		}
 		else {
@@ -1355,7 +1354,8 @@ void UserSimulator::ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosit
 				//XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]);
 
 				//seperate bias for recurrent connection
-				XHCurrentTimeStep = XI + (_hiddenWeightsBack[l] * _hiddenStepValuesBack.front()[l]) + _biasesRecurrentHiddenBack[l].Vec();
+				if (trainMode) XHCurrentTimeStep = XI + (_hiddenWeightsBack[l] * (_hiddenStepValuesBack.front()[l] * _recurrentMasks[l].Array())) + _biasesRecurrentHiddenBack[l].Vec();
+				else XHCurrentTimeStep = XI + (_hiddenWeightsBack[l] * _hiddenStepValuesBack.front()[l]) + _biasesRecurrentHiddenBack[l].Vec();
 			}
 		}
 
@@ -1491,6 +1491,8 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	for (int t = _outputValuesCombined.size() - 1; t >= 0; t--) {
 		// Cross-entropy loss gradient w.r.t. softmax input
 		CUDAMatrix outputGrad = _outputValuesCombined[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
+		outputGrad = outputGrad * _weightsForClasses.Vec();
+
 		//CUDAMatrix outputGrad = _outputValuesCombined[t] - (oneHotEncodedLabels[t + 1] * _weightsForClasses.Vec()); // Gradient of softmax + cross-entropy
 
 		// Gradients for the output layer
@@ -1557,6 +1559,8 @@ void UserSimulator::BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double
 	for (int t = 0; t < _outputValuesCombined.size() - 1; t++) {
 		// Cross-entropy loss gradient w.r.t. softmax input
 		CUDAMatrix outputGrad = _outputValuesCombined[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
+		outputGrad = outputGrad * _weightsForClasses.Vec();
+
 		//CUDAMatrix outputGrad = _outputValuesCombined[t] - (oneHotEncodedLabels[t + 1] * _weightsForClasses.Vec()); // Gradient of softmax + cross-entropy
 
 		// Gradients for the output layer
@@ -1739,6 +1743,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 	_updateGateValues.clear();
 	_candidateActivationValues.clear();
 	_hiddenStepValuesCombined.clear();
+	_recurrentMasks.clear();
 	_oneHotEncodedClicks = onehotEncodedLabels;
 	std::vector<CUDAMatrix> oheLabelsRev = onehotEncodedLabels;
 	std::reverse(oheLabelsRev.begin(), oheLabelsRev.end());
@@ -1755,6 +1760,33 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 	std::default_random_engine re = _mathHandler->GetRandomEngine();
 
 	int allClasses = _biasesOutput.GetRows();
+
+	if (trainMode)
+	{
+		//std::vector<CUDAMatrix> recurrentMasks;
+		for (int i = 0; i < _hiddenLayerNeurons.size(); i++) {
+			CUDAMatrix mask = CUDAMatrix::One(_hiddenLayerNeurons[i], _batchSize);
+			/*if (i == 0) mask = CUDAMatrix::One(_inputNeurons, 1);
+			else mask = CUDAMatrix::One(_hiddenLayerNeurons[i - 1], 1);*/
+
+			for (int j = 0; j < mask.GetColumns(); j++) {
+				for (int k = 0; k < mask.GetRows(); k++) {
+					double isDropout = unif(re);
+					if (isDropout < _dropoutRate) {
+						mask(k, j) = 0.0;
+					}
+					else {
+						// scale other inputs to account for dropped out neurons
+						mask(k, j) = mask(k, j) * (1.0 / (1.0 - _dropoutRate));
+					}
+				}
+			}
+			_recurrentMasks.push_back(mask);
+		}
+
+		//_recurrentMasks = recurrentMasks; 
+	}
+
 
 	for (int i = 0; i < onehotEncodedLabels.size() - (performBackProp || validationMode ? 1 : 0); i++) {
 
