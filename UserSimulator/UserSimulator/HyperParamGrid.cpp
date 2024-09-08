@@ -84,11 +84,8 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 		_hiddenUnits.push_back(hiddenNeuronsCombination2);
 
 		_sequenceLength.push_back(5);
-		_sequenceLength.push_back(10);
-
-		/*_sequenceLength.push_back(10);
-		_sequenceLength.push_back(20);
-		_sequenceLength.push_back(30);*/
+		//_sequenceLength.push_back(10);
+		//_sequenceLength.push_back(20);
 	}
 	else {
 		_hiddenUnits.push_back(hiddenNeuronsCombination1);

@@ -18,14 +18,16 @@
 class UserSimulator
 {
 public:
-	UserSimulator(int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
+	UserSimulator(bool isBiRNN, int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength);
 	UserSimulator();
 	double EvaluateOnValidateSet(int lossType);
 	std::deque<std::tuple<int, double>> PredictNextClickFromSequence(std::vector<CUDAMatrix> onehotEncodedLabels,
 		bool performBackProp, bool verboseMode, bool trainMode, bool validationMode, int selectNTopClasses = 1);
 	std::vector<std::vector<int>> PredictAllSequencesFromSequence(std::vector<int> startingSequence, int seqLen);
-	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, 
-		bool forwardDirection, int fullSeqLength, CUDAMatrix* nextAction = nullptr);
+	void ForwardPropBiRNN(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, 
+		bool forwardDirection, int fullSeqLength);
+	void BackPropBiRNN(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
+	void ForwardProp(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode, bool validationMode, CUDAMatrix* nextAction = nullptr);
 	void BackProp(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
 	void ForwardPropGated(CUDAMatrix onehotEncodedInput, int sequencePosition, bool verboseMode, bool trainMode);
 	void BackPropGated(std::vector<CUDAMatrix> oneHotEncodedLabels, double learningRate, bool verboseMode);
@@ -148,7 +150,7 @@ private:
 
 	double _totalLoss;
 	double _totalLossGeneral;
-
+	bool _isBiRNN;
 	int _inputNeurons;
 	std::vector<int> _hiddenLayerNeurons;
 	std::vector<LayerActivationFuncs> _hiddenLayerNeuronsActivationFuncs;
@@ -200,5 +202,7 @@ private:
 		ar& _commandIDsMap;
 		ar& _totalNumberOfSamples;
 		ar& _dropoutRate;
+		ar& _isBiRNN;
+		ar& _recurrentMasks;
 	}
 };
