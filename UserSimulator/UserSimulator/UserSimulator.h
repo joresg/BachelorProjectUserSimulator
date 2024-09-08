@@ -60,6 +60,7 @@ public:
 	int GetTrainingSequenceLength() { return _trainingSeqLength; }
 	void SetBatchSize(int newBatchSize) { _batchSize = newBatchSize; }
 	void SetGatedUnits(GatedUnits gu) { _gatedUnits = gu; }
+	bool GetDirectionality() { return _isBiRNN; }
 	GatedUnits GetGatedUnits() { return _gatedUnits; }
 	void SetCmdIDsMap(std::map<std::string, std::tuple<int, int>> commandIDsMap) { _commandIDsMap = commandIDsMap; }
 	std::map<std::string, std::tuple<int, int>> GetCmdIDsMap() { return _commandIDsMap; }

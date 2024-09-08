@@ -8,8 +8,8 @@
 
 using json = nlohmann::json;
 
-static void SerializeModel(UserSimulator* userSimulator) {
-	std::ofstream ofs("user_simulator.dat");
+static void SerializeModel(UserSimulator* userSimulator, std::string fileName) {
+	std::ofstream ofs(fileName);
 	boost::archive::text_oarchive oa(ofs);
 	oa << userSimulator;
 }
@@ -194,17 +194,6 @@ int main() {
 	int allClasses;
 	bool trainModel = true;
 
-	std::ifstream file("user_simulator.dat");
-
-	if (file) {
-		printf("existing model parameters found, loading model...\n");
-		bestModel = new UserSimulator();
-		std::ifstream ifs("user_simulator.dat");
-		boost::archive::text_iarchive ia(ifs);
-		ia >> bestModel;
-		allClasses = bestModel->GetAllClasses();
-	}
-
 	if (trainModel)
 	{
 		bool verboseMode = false;
@@ -217,10 +206,10 @@ int main() {
 		std::map<std::string, std::tuple<int, int>> commandIDsMap;
 		std::tuple<std::vector<std::vector<int>>, std::map<std::string, std::tuple<int, int>>> readFileRes;
 
-		//const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
-		const char* filePath = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\allSequences.txt)";
+		//const char* filePathTrainingData = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)";
+		const char* filePathTrainingData = R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\allSequences.txt)";
 
-		allClasses = fileManager->AllClassesFromFile(filePath);
+		allClasses = fileManager->AllClassesFromFile(filePathTrainingData);
 		int inputNeurons = allClasses;
 		int outputNeurons = allClasses;
 
@@ -249,7 +238,7 @@ int main() {
 			cudaDeviceReset();
 
 			//readFileRes = fileManager->ReadTXTFile(R"(C:\Users\joresg\git\BachelorProjectCUDA\UserSimulator\inputData\unixCommandData.txt)", true, std::get<2>(paramCombo));
-			readFileRes = fileManager->ReadTXTFile(filePath, true, std::get<2>(paramCombo));
+			readFileRes = fileManager->ReadTXTFile(filePathTrainingData, true, std::get<2>(paramCombo));
 			allSequencesFromFile = std::get<0>(readFileRes);
 			commandIDsMap = std::get<1>(readFileRes);
 			int samplesCnt = 0;
@@ -263,6 +252,26 @@ int main() {
 
 			// batch can't be too big, let it be relative to training set size
 			if (std::get<3>(paramCombo) > trainingSetSize / 16) continue;
+
+			std::string fileNameModelParameters = "user_simulator_";
+			fileNameModelParameters += split(filePathTrainingData, '\\').back();
+			fileNameModelParameters += "_";
+			fileNameModelParameters += std::to_string(std::get<2>(paramCombo));
+			fileNameModelParameters += ".dat";
+
+			if (bestModel == nullptr)
+			{
+				std::ifstream file(fileNameModelParameters);
+
+				if (file) {
+					printf("existing model parameters found, loading model %s...\n", fileNameModelParameters.c_str());
+					bestModel = new UserSimulator();
+					std::ifstream ifs(fileNameModelParameters);
+					boost::archive::text_iarchive ia(ifs);
+					ia >> bestModel;
+					allClasses = bestModel->GetAllClasses();
+				}
+			}
 
 			int validationSetSize = allSequencesFromFile.size() - trainingSetSize;
 
@@ -351,7 +360,9 @@ int main() {
 					return ss.str();
 				});
 
-			std::string RNNType = userSimulator->GetGatedUnits() == NoGates ? "Classic RNN" : "GRU";
+			std::string RNNType = userSimulator->GetDirectionality() ? "Bi" : "";
+
+			RNNType += userSimulator->GetGatedUnits() == NoGates ? "RNN" : "GRU";
 
 			printf("%s, learning rate: %.10f, allClasses: %d, hidden units: {%s}, seq length: %d, batch size: %d\n", RNNType.c_str(), std::get<0>(paramCombo), allClasses, hiddenNeuronsString.c_str(), std::get<2>(paramCombo), std::get<3>(paramCombo));
 			printf("cross entropy for best model so far: %f\n", bestModel != nullptr ? bestModel->GetModelACcOnValidationData() : -1);
@@ -536,8 +547,8 @@ int main() {
 						}
 						break;
 					}
-					else if ((currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) || currentLoss <= 1 || currentEpoch > 20) {
-						if ((loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5) || currentLoss <= 1 || currentEpoch > 20)
+					else if ((currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) || currentLoss <= 0.05 || currentEpoch > 45) {
+						if ((loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5) || currentLoss <= 0.05 || currentEpoch > 45)
 						{
 							printf("learning converged....\n");
 
@@ -585,20 +596,27 @@ int main() {
 
 			if (bestModel == nullptr || userSimulator->GetModelACcOnValidationData() < bestModel->GetModelACcOnValidationData()) {
 				bestModel = userSimulator;
-				SerializeModel(bestModel);
+				SerializeModel(bestModel, fileNameModelParameters);
 			}
 		}
 
 		printf("finished searching for optimal hpyerparameters\n");
 		//SerializeModel(bestModel);
 	}
-	/*else {
-		bestModel = new UserSimulator();
-		std::ifstream ifs("user_simulator.dat");
-		boost::archive::text_iarchive ia(ifs);
-		ia >> bestModel;
-		allClasses = bestModel->GetAllClasses();
-	}*/
+	else {
+		std::string fileName = "user_simulator_X.dat";
+
+		std::ifstream file(fileName);
+
+		if (file) {
+			printf("existing model parameters found, loading model %s...\n", fileName.c_str());
+			bestModel = new UserSimulator();
+			std::ifstream ifs(fileName);
+			boost::archive::text_iarchive ia(ifs);
+			ia >> bestModel;
+			allClasses = bestModel->GetAllClasses();
+		}
+	}
 
 	crow::SimpleApp app;
 
