@@ -388,7 +388,7 @@ int main() {
 
 				// curriculum learning for early timesteps which don't have much context
 
-				userSimulator->SetLearningRate(lastLR * 5);
+				userSimulator->SetLearningRate(lastLR * 8);
 
 				printf("starting curriculum training...\n");
 
@@ -735,6 +735,9 @@ UserSimulator::UserSimulator(bool isBiRNN, int inputNeurons, std::vector<std::tu
 		//_biasesRecurrentHidden.push_back(CUDAMatrix(std::get<0>(i), 1));
 		_biasesRecurrentHidden.push_back(CUDAMatrix::Zero(std::get<0>(i), 1));
 		_biasesRecurrentHiddenBack.push_back(CUDAMatrix::Zero(std::get<0>(i), 1));
+
+		_layerNormalizationScaleParameters.push_back(CUDAMatrix::One(std::get<0>(i), 1));
+		_layerNormalizationShiftParameters.push_back(CUDAMatrix::Zero(std::get<0>(i), 1));
 	}
 
 	_momentumCoefficient = 0.9;
@@ -1276,7 +1279,54 @@ void UserSimulator::ForwardPropBiRNN(CUDAMatrix onehotEncodedInput, int sequence
 
 		XHCurrentTimeStep += (forwardDirection ? _biasesHidden[l].Vec() : _biasesHiddenBack[l].Vec());
 
-		// todo layer normalization.....
+		//CUDAMatrix normalizedLayer = XHCurrentTimeStep;
+
+		//CUDAMatrix meanBatch = CUDAMatrix::Zero(normalizedLayer.GetRows(), normalizedLayer.GetColumns());
+		//for (int i = 0; i < normalizedLayer.GetRows(); i++) {
+		//	for (int j = 0; j < normalizedLayer.GetColumns(); j++) {
+		//		meanBatch(0, j) += normalizedLayer(i, j);
+		//	}
+		//}
+
+		//for (int i = 0; i < normalizedLayer.GetRows(); i++) {
+		//	for (int j = 0; j < normalizedLayer.GetColumns(); j++) {
+		//		meanBatch(i, j) = meanBatch(0, j);
+		//	}
+		//}
+
+		//meanBatch = meanBatch / normalizedLayer.GetRows();
+
+		//CUDAMatrix varianceBatch = CUDAMatrix::Zero(normalizedLayer.GetRows(), normalizedLayer.GetColumns());
+
+		//for (int i = 0; i < normalizedLayer.GetRows(); i++) {
+		//	for (int j = 0; j < normalizedLayer.GetColumns(); j++) {
+		//		varianceBatch(0, j) += std::pow(normalizedLayer(i, j) - meanBatch(0, j), 2);
+		//	}
+		//}
+
+		//for (int i = 0; i < normalizedLayer.GetRows(); i++) {
+		//	for (int j = 0; j < normalizedLayer.GetColumns(); j++) {
+		//		varianceBatch(i, j) = varianceBatch(0, j);
+		//	}
+		//}
+
+		//varianceBatch = varianceBatch / normalizedLayer.GetRows();
+
+		//varianceBatch = varianceBatch.sqrt();
+		//varianceBatch = varianceBatch + std::sqrt(0.000001);
+
+		//// scale and shift
+
+
+		//CUDAMatrix layerNormalizationScaleParametersBatch(_layerNormalizationScaleParameters[l].GetRows(), XHCurrentTimeStep.GetColumns());
+		//for (int i = 0; i < layerNormalizationScaleParametersBatch.GetRows(); i++) {
+		//	for (int j = 0; j < layerNormalizationScaleParametersBatch.GetColumns(); j++) {
+		//		layerNormalizationScaleParametersBatch(i, j) = _layerNormalizationScaleParameters[l](i, 0);
+		//	}
+		//}
+
+		//normalizedLayer = (layerNormalizationScaleParametersBatch / varianceBatch.Array()) * (XHCurrentTimeStep - meanBatch).Array() + _layerNormalizationShiftParameters[l].Vec();
+		//activatedHiddenLayer = normalizedLayer.Activate(_hiddenLayerNeuronsActivationFuncs[l]);
 
 		activatedHiddenLayer = XHCurrentTimeStep.Activate(_hiddenLayerNeuronsActivationFuncs[l]);
 		allHiddenLayers.push_back(activatedHiddenLayer);
@@ -1711,14 +1761,11 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 	if (trainMode)
 	{
-		//std::vector<CUDAMatrix> recurrentMasks;
 		for (int i = 0; i < _hiddenLayerNeurons.size(); i++) {
 			CUDAMatrix mask = CUDAMatrix::One(_hiddenLayerNeurons[i], _batchSize);
-			/*if (i == 0) mask = CUDAMatrix::One(_inputNeurons, 1);
-			else mask = CUDAMatrix::One(_hiddenLayerNeurons[i - 1], 1);*/
-
 			for (int j = 0; j < mask.GetColumns(); j++) {
 				for (int k = 0; k < mask.GetRows(); k++) {
+					// different for every sample in batch
 					double isDropout = unif(re);
 					if (isDropout < _dropoutRate) {
 						mask(k, j) = 0.0;
@@ -1731,8 +1778,6 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 			}
 			_recurrentMasks.push_back(mask);
 		}
-
-		//_recurrentMasks = recurrentMasks; 
 	}
 
 

@@ -88,6 +88,9 @@ public:
 private:
 	friend class boost::serialization::access;
 
+	std::vector<CUDAMatrix> _layerNormalizationScaleParameters;
+	std::vector<CUDAMatrix> _layerNormalizationShiftParameters;
+
 	MathHandler* _mathHandler;
 	GatedUnits _gatedUnits;
 	std::vector<CUDAMatrix> _inputWeights;

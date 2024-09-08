@@ -19,7 +19,7 @@ MathHandler::MathHandler(unsigned long randomSeed) : _randSeed(randomSeed), _re(
 }
 
 enum MatrixOperation {Add, AddInvert, Substract, SubstractInvert, Multiply, Divide, SquaredSubstractInvert, DivideExp, Exp, OneHotEncodedVector, ReLUDerivative, LeakyReLUDerivative, SigmoidDerivative, None,
-DropoutMask, Log};
+DropoutMask, Log, Sqrt};
 
 #pragma region CUDA kernels
 __device__ double atomicAddDouble(double* address, double val) {
@@ -173,6 +173,7 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
             if (A[index] > 0) C[index] = std::log(A[index]);
             else C[index] = 0;
         }
+        else if (op == Sqrt) C[index] = std::sqrt(A[index]);
     }
 }
 
@@ -455,6 +456,15 @@ CUDAMatrix applyExpToMatrix(CUDAMatrix* inputMatrix) {
     return resMatrix;
 }
 
+CUDAMatrix applySqrtToMatrix(CUDAMatrix* inputMatrix) {
+    MatrixOperation op = Sqrt;
+    double* matRes = new double[inputMatrix->GetRows() * inputMatrix->GetColumns()];
+    matrixElementWiseOperations(inputMatrix->GetUnderlyingMatrix(), -1, matRes, inputMatrix->GetRows(), inputMatrix->GetColumns(), op);
+    CUDAMatrix resMatrix(inputMatrix->GetRows(), inputMatrix->GetColumns());
+    resMatrix.SetUnderlyingMatrix(matRes);
+    return resMatrix;
+}
+
 CUDAMatrix applyLogToMatrix(CUDAMatrix* inputMatrix) {
     MatrixOperation op = Log;
     double* matRes = new double[inputMatrix->GetRows() * inputMatrix->GetColumns()];
@@ -482,6 +492,10 @@ CUDAMatrix CUDAMatrix::sigmoid() {
 
 CUDAMatrix CUDAMatrix::exp() {
     return applyExpToMatrix(this);
+}
+
+CUDAMatrix CUDAMatrix::sqrt() {
+    return applySqrtToMatrix(this);
 }
 
 CUDAMatrix CUDAMatrix::log() {

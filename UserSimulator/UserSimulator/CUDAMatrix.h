@@ -62,6 +62,7 @@ public:
 	CUDAMatrix exp();
 	CUDAMatrix log();
 	CUDAMatrix transpose();
+	CUDAMatrix sqrt();
 	CUDAMatrix RowAverage();
 	// Frobenius norm for gradient clipping
 	double Norm();
