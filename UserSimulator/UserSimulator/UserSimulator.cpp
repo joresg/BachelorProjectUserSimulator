@@ -192,7 +192,7 @@ void CUDAMathTest(UserSimulator* userSimulator) {
 int main() {
 	UserSimulator* bestModel = nullptr;
 	int allClasses;
-	bool trainModel = false;
+	bool trainModel = true;
 
 	std::ifstream file("user_simulator.dat");
 
