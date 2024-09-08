@@ -218,8 +218,10 @@ int main() {
 		double lastLR = 0;
 		bool lrWarmup = true;
 		bool useLRDecay = true;
-		int lrWarmupSteps = 100;
+		int lrWarmupSteps = 500;
 		double lrWarmupStepIncrease = 0;
+		bool normalizeClassWeights = true;
+		bool useCurriculumLearning = true;
 		// learning rate, hidden units, seq length, batch size
 		for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
 
@@ -278,6 +280,7 @@ int main() {
 			std::vector<std::vector<int>> trainingSet;
 			std::vector<std::vector<int>> trainingSetCurriculum;
 			std::vector<std::vector<int>> validationSet;
+			std::vector<std::vector<int>> validationSetCurriculum;
 
 			UserSimulator* userSimulator = new UserSimulator(true, inputNeurons, std::get<1>(paramCombo), outputNeurons, lrWarmup ? 0 : std::get<0>(paramCombo), std::get<3>(paramCombo), std::get<2>(paramCombo));
 			userSimulator->SetAllClasses(allClasses);
@@ -298,11 +301,14 @@ int main() {
 			}
 
 			double shiftLow = 1.0;
-			double shiftHigh = 2.0;
+			double shiftHigh = 3.0;
 
-			// normalize between shiftLow and shiftHigh
-			for (int i = 0; i < classWeights.GetRows(); i++) {
-				classWeights(i, 0) = shiftLow + ((classWeights(i, 0) - classWeightsMin) * (shiftHigh - shiftLow) / (classWeightsMax - classWeightsMin));
+			if (normalizeClassWeights)
+			{
+				// normalize between shiftLow and shiftHigh
+				for (int i = 0; i < classWeights.GetRows(); i++) {
+					classWeights(i, 0) = shiftLow + ((classWeights(i, 0) - classWeightsMin) * (shiftHigh - shiftLow) / (classWeightsMax - classWeightsMin));
+				}
 			}
 
 			userSimulator->SetWeightsForClasses(classWeights);
@@ -317,7 +323,7 @@ int main() {
 				trainingSet.push_back(allSequencesFromFile[i]);
 
 				std::vector<int>::const_iterator first = allSequencesFromFile[i].begin();
-				std::vector<int>::const_iterator last = allSequencesFromFile[i].begin() + std::max(userSimulator->GetTrainingSequenceLength() / 5, 3);
+				std::vector<int>::const_iterator last = allSequencesFromFile[i].begin() + std::max(userSimulator->GetTrainingSequenceLength() / 5, 2);
 				std::vector<int> newVec(first, last);
 
 				trainingSetCurriculum.push_back(newVec);
@@ -325,10 +331,15 @@ int main() {
 
 			for (int i = trainingSetSize; i < allSequencesFromFile.size(); i++) {
 				validationSet.push_back(allSequencesFromFile[i]);
-				//userSimulator->GetValidationSet().push_back(allSequencesFromFile[i]);
+
+				std::vector<int>::const_iterator first = allSequencesFromFile[i].begin();
+				std::vector<int>::const_iterator last = allSequencesFromFile[i].begin() + std::max(userSimulator->GetTrainingSequenceLength() / 5, 2);
+				std::vector<int> newVec(first, last);
+
+				validationSetCurriculum.push_back(newVec);
 			}
 
-			userSimulator->SetValidationSet(validationSet);
+			userSimulator->SetValidationSet(validationSetCurriculum);
 
 			int batchSize = userSimulator->GetBatchSize();
 			int currentEpoch = 0;
@@ -370,118 +381,130 @@ int main() {
 			bool loweredLearningRate = false;
 			int loweredLearningRateEpoch = 0;
 
-			//double lossBeforeCurriculumTraining = userSimulator->EvaluateOnValidateSet(1);
-			//printf("loss before curriculum training: %f\n", lossBeforeCurriculumTraining);
+			if (useCurriculumLearning)
+			{
+				double lossBeforeCurriculumTraining = userSimulator->EvaluateOnValidateSet(1);
+				printf("loss before curriculum training: %f\n", lossBeforeCurriculumTraining);
 
-			//// curriculum learning for early timesteps which don't have much context
+				// curriculum learning for early timesteps which don't have much context
 
-			//printf("starting curriculum training...\n");
+				userSimulator->SetLearningRate(lastLR * 5);
 
-			//while (true) {
-			//	progress = 1;
-			//	std::cout << "EPOCH: " << currentEpoch << std::endl;
+				printf("starting curriculum training...\n");
 
-			//	int trainingExamplesCount = trainingSetCurriculum.size();
-			//	userSimulator->SetAllTrainingExamplesCount(trainingExamplesCount);
+				while (true) {
+					progress = 1;
+					std::cout << "EPOCH: " << currentEpoch << std::endl;
 
-			//	for (int k = 0; k < trainingExamplesCount; k += batchSize) {
-			//		std::vector<std::vector<int>>::const_iterator first = trainingSetCurriculum.begin() + k;
-			//		std::vector<std::vector<int>>::const_iterator last = trainingSetCurriculum.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount);
-			//		std::vector<std::vector<int>> newVec(first, last);
-			//		userSimulator->SetBatchSize(newVec.size());
-			//		std::tuple< std::vector<CUDAMatrix>, std::vector<CUDAMatrix>> oneHotEncodedInputs = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, classWeights, allClasses, userSimulator->GetBatchSize());
-			//		std::vector<CUDAMatrix> oneHotEncodedInput = std::get<0>(oneHotEncodedInputs);
-			//		std::vector<CUDAMatrix> oneHotEncodedInputMask = std::get<1>(oneHotEncodedInputs);
+					int trainingExamplesCount = trainingSetCurriculum.size();
+					userSimulator->SetAllTrainingExamplesCount(trainingExamplesCount);
 
-			//		if (k > 0 && k / (int)(trainingExamplesCount * 0.1) >= progress && progress <= 10) {
-			//			std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
-			//			progress++;
-			//		}
-			//		//printf("iteration: %d / %d\n", k, trainingExamplesCount);
+					for (int k = 0; k < trainingExamplesCount; k += batchSize) {
+						std::vector<std::vector<int>>::const_iterator first = trainingSetCurriculum.begin() + k;
+						std::vector<std::vector<int>>::const_iterator last = trainingSetCurriculum.begin() + (k + batchSize < trainingExamplesCount ? k + batchSize : trainingExamplesCount);
+						std::vector<std::vector<int>> newVec(first, last);
+						userSimulator->SetBatchSize(newVec.size());
+						std::tuple< std::vector<CUDAMatrix>, std::vector<CUDAMatrix>> oneHotEncodedInputs = userSimulator->GetMathEngine()->CreateBatchOneHotEncodedVector(newVec, classWeights, allClasses, userSimulator->GetBatchSize());
+						std::vector<CUDAMatrix> oneHotEncodedInput = std::get<0>(oneHotEncodedInputs);
+						std::vector<CUDAMatrix> oneHotEncodedInputMask = std::get<1>(oneHotEncodedInputs);
 
-			//		userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true, false);
-			//		if (lrWarmup && userSimulator->GetLearningRate() < lastLR) userSimulator->SetLearningRate(userSimulator->GetLearningRate() + lrWarmupStepIncrease);
-			//		else lrWarmup = false;
-			//	}
+						if (k > 0 && k / (int)(trainingExamplesCount * 0.1) >= progress && progress <= 10) {
+							std::cout << (k / (int)(trainingExamplesCount * 0.1)) * 10 << "%" << std::endl;
+							progress++;
+						}
+						//printf("iteration: %d / %d\n", k, trainingExamplesCount);
 
-			//	userSimulator->SetBatchSize(batchSize);
+						userSimulator->PredictNextClickFromSequence(oneHotEncodedInput, true, verboseMode, true, false);
+						if (lrWarmup && userSimulator->GetLearningRate() < lastLR) userSimulator->SetLearningRate(userSimulator->GetLearningRate() + lrWarmupStepIncrease);
+						else lrWarmup = false;
+					}
 
-			//	// run validation for early stoppping, learn while cross entropy loss on validation set is improving
+					userSimulator->SetBatchSize(batchSize);
 
-			//	if (currentEpoch >= 0)
-			//	{
-			//		double currentLoss = userSimulator->EvaluateOnValidateSet(1);
+					// run validation for early stoppping, learn while cross entropy loss on validation set is improving
 
-			//		if (std::isinf(currentLoss) || currentLoss == DBL_MAX || currentLoss < 0.4 || currentLoss <= lossBeforeCurriculumTraining / 2) {
-			//			printf("error\n");
-			//			if (maxAccAchieved < currentLoss) {
-			//				userSimulator->RestoreBestParameters();
-			//				userSimulator->SetModelAccOnValidationData(maxAccAchieved);
-			//			}
-			//			else {
-			//				userSimulator->GetAllClasses();
-			//				userSimulator->SetModelAccOnValidationData(currentLoss);
-			//			}
-			//			break;
-			//		}
-			//		else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 5) {
-			//			if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 5)
-			//			{
-			//				printf("learning converged....\n");
+					if (currentEpoch >= 0)
+					{
+						double currentLoss = userSimulator->EvaluateOnValidateSet(1);
 
-			//				if (currentLoss < maxAccAchieved * 0.99)
-			//				{
-			//					lastModelConverged = true;
-			//					userSimulator->SetModelAccOnValidationData(currentLoss);
-			//					break;
-			//				}
-			//				else {
-			//					lastModelConverged = true;
-			//					userSimulator->RestoreBestParameters();
-			//					userSimulator->SetModelAccOnValidationData(maxAccAchieved);
-			//					break;
-			//				}
-			//			}
-			//			else if (!loweredLearningRate) {
-			//				printf("learning might be in local optimum, lowering lr....\n");
-			//				userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
-			//				loweredLearningRateEpoch = currentEpoch;
-			//				loweredLearningRate = true;
-			//			}
-			//		}
-			//		else if (currentLoss < maxAccAchieved * 0.99) {
-			//			maxAccAchieved = currentLoss;
-			//			maxAccEpoch = currentEpoch;
-			//			userSimulator->CopyParameters();
-			//		}
-			//		else if (currentLoss > maxAccAchieved * 1.05) {
-			//			printf("model unstable, lowering lr\n");
-			//			userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
-			//		}
-			//		else if (currentLoss > maxAccAchieved * 1.2) {
-			//			printf("model deteriorated too much stopping training\n");
-			//			userSimulator->RestoreBestParameters();
-			//			break;
-			//		}
-			//	}
-			//	if (!lrWarmup && useLRDecay && userSimulator->GetLearningRate() > minLR) {
-			//		userSimulator->SetLearningRate(lastLR * std::exp(-0.05 * currentEpoch));
-			//	}
+						if (std::isinf(currentLoss) || currentLoss == DBL_MAX) {
+							printf("error\n");
+							if (maxAccAchieved < currentLoss) {
+								userSimulator->RestoreBestParameters();
+								userSimulator->SetModelAccOnValidationData(maxAccAchieved);
+							}
+							else {
+								userSimulator->GetAllClasses();
+								userSimulator->SetModelAccOnValidationData(currentLoss);
+							}
+							break;
+						}
+						else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 3 || currentLoss < 0.1 || currentEpoch > 10) {
+							if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 3 || currentLoss < 0.1 || currentEpoch > 10)
+							{
+								printf("learning converged....\n");
 
-			//	currentEpoch++;
-			//}
+								if (currentLoss < maxAccAchieved * 0.99)
+								{
+									lastModelConverged = true;
+									userSimulator->SetModelAccOnValidationData(currentLoss);
+									break;
+								}
+								else {
+									lastModelConverged = true;
+									userSimulator->RestoreBestParameters();
+									userSimulator->SetModelAccOnValidationData(maxAccAchieved);
+									break;
+								}
+							}
+							else if (!loweredLearningRate) {
+								printf("learning might be in local optimum, lowering lr....\n");
+								userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
+								loweredLearningRateEpoch = currentEpoch;
+								loweredLearningRate = true;
+							}
+						}
+						else if (currentLoss < maxAccAchieved * 0.99) {
+							maxAccAchieved = currentLoss;
+							maxAccEpoch = currentEpoch;
+							userSimulator->CopyParameters();
+						}
+						else if (currentLoss > maxAccAchieved * 1.05) {
+							printf("model unstable, lowering lr\n");
+							userSimulator->SetLearningRate(userSimulator->GetLearningRate() * 0.1);
+						}
+						else if (currentLoss > maxAccAchieved * 1.2) {
+							printf("model deteriorated too much stopping training\n");
+							userSimulator->RestoreBestParameters();
+							break;
+						}
+					}
+					if (!lrWarmup && useLRDecay && userSimulator->GetLearningRate() > minLR) {
+						userSimulator->SetLearningRate(lastLR * std::exp(-0.05 * currentEpoch));
+					}
+
+					currentEpoch++;
+				} 
+			}
 
 			userSimulator->SetBatchSize(batchSize);
+			userSimulator->SetLearningRate(lastLR);
+			userSimulator->SetValidationSet(validationSet);
 
-			//shiftLow = 1;
-			//shiftHigh = 2;
+			if (normalizeClassWeights)
+			{
+				shiftLow = 1.0;
+				shiftHigh = 2.0;
 
-			//// normalize between shiftLow and shiftHigh
-			//for (int i = 0; i < classWeights.GetRows(); i++) {
-			//	classWeights(i, 0) = shiftLow + ((classWeights(i, 0) - classWeightsMin) * (shiftHigh - shiftLow) / (classWeightsMax - classWeightsMin));
-			//}
+				// normalize between shiftLow and shiftHigh
+				for (int i = 0; i < classWeights.GetRows(); i++) {
+					classWeights(i, 0) = shiftLow + ((classWeights(i, 0) - classWeightsMin) * (shiftHigh - shiftLow) / (classWeightsMax - classWeightsMin));
+				}
 
-			userSimulator->SetWeightsForClasses(classWeights);
+				userSimulator->SetWeightsForClasses(classWeights);
+			}
+
+			//userSimulator->SetWeightsForClasses(classWeights);
 
 			printf("starting training...\n");
 

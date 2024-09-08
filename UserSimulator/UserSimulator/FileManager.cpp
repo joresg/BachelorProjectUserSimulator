@@ -51,7 +51,7 @@ std::tuple<std::vector<std::vector<int>>, std::map<std::string, std::tuple<int, 
 	int seqOverlap = seqLength - 1;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = 5000;
+	int limitLines = -1;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
@@ -112,7 +112,7 @@ int FileManager::AllClassesFromFile(const char* filePath) {
 	std::string line;
 	int cmdID = -1;
 	int generatedID = 0;
-	int limitLines = 5000;
+	int limitLines = -1;
 
 	std::cout << "READING TXT FILE: " << filePath << std::endl;
 
