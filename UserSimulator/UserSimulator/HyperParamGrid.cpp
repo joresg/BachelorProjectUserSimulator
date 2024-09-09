@@ -3,7 +3,7 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
-	_learningRate.push_back(0.05);
+	//_learningRate.push_back(0.05);
 	_learningRate.push_back(0.01);
 	_learningRate.push_back(0.005);
 	_learningRate.push_back(0.001);

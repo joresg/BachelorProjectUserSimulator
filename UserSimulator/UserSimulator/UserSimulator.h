@@ -150,7 +150,8 @@ private:
 	std::vector<CUDAMatrix> _oneHotEncodedClicks;
 	std::vector<CUDAMatrix> _oneHotEncodedClicksReversed;
 
-	std::vector<CUDAMatrix> _recurrentMasks;
+	std::vector<CUDAMatrix> _dropoutRecurrentMasks;
+	std::vector<CUDAMatrix> _dropoutMasks;
 
 	double _totalLoss;
 	double _totalLossGeneral;
@@ -174,6 +175,10 @@ private:
 	int _totalNumberOfSamples;
 
 	double _dropoutRate;
+	double _dropoutRecurrentRate;
+
+	bool _useDropout;
+	bool _useRecurrentDropout;
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {
@@ -205,8 +210,10 @@ private:
 		ar& _momentumCoefficient;
 		ar& _commandIDsMap;
 		ar& _totalNumberOfSamples;
+		ar& _dropoutRecurrentRate;
 		ar& _dropoutRate;
 		ar& _isBiRNN;
-		ar& _recurrentMasks;
+		ar& _dropoutRecurrentMasks;
+		ar& _dropoutMasks;
 	}
 };
