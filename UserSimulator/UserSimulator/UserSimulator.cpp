@@ -683,8 +683,8 @@ UserSimulator::UserSimulator(){
 
 UserSimulator::UserSimulator(bool isBiRNN, int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : 
 	_weightsOutput(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]) * (isBiRNN ? 2 : 1)), _weightsOutputBack(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1])),
-	_batchSize(batchSize), _allTrainingExamplesCount(-1), _gradientClippingThresholdMax(5), _gradientClippingThresholdMin(0.1), _totalNumberOfSamples(-1), _modelAccuracy(DBL_MAX), _dropoutRecurrentRate(0.1), 
-	_dropoutRate(0.1), _isBiRNN(isBiRNN), _useDropout(false), _useRecurrentDropout(false) {
+	_batchSize(batchSize), _allTrainingExamplesCount(-1), _gradientClippingThresholdMax(5), _gradientClippingThresholdMin(0.1), _totalNumberOfSamples(-1), _modelAccuracy(DBL_MAX), _dropoutRate(0.2), 
+	_isBiRNN(isBiRNN), _useDropout(true), _useRecurrentDropout(true) {
 
 	_gatedUnits = NoGates;
 
@@ -1249,7 +1249,8 @@ void UserSimulator::ForwardPropBiRNN(CUDAMatrix onehotEncodedInput, int sequence
 			XI = (forwardDirection ? _inputWeights[0] : _inputWeightsBack[0]) * onehotEncodedInput;
 		}
 		else {
-			XI = (forwardDirection ? _inputWeights[l].transpose() : _inputWeightsBack[l].transpose()) * allHiddenLayers[allHiddenLayers.size() - 1];
+			if (trainMode && _useDropout) XI = (forwardDirection ? _inputWeights[l].transpose() : _inputWeightsBack[l].transpose()) * (allHiddenLayers[allHiddenLayers.size() - 1] * _variationalDropoutMasks[l - 1].Array());
+			else XI = (forwardDirection ? _inputWeights[l].transpose() : _inputWeightsBack[l].transpose()) * allHiddenLayers[allHiddenLayers.size() - 1];
 		}
 		// if first element in sequence XHidden at previous time step non existent, just take XI(nput)
 		if (forwardDirection)
@@ -1261,7 +1262,7 @@ void UserSimulator::ForwardPropBiRNN(CUDAMatrix onehotEncodedInput, int sequence
 				//XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]);
 
 				//seperate bias for recurrent connection
-				if (trainMode && _useRecurrentDropout) XHCurrentTimeStep = XI + (_hiddenWeights[l] * (_hiddenStepValues[sequencePosition - 1][l] * _dropoutRecurrentMasks[l].Array())) + _biasesRecurrentHidden[l].Vec();
+				if (trainMode && _useRecurrentDropout) XHCurrentTimeStep = XI + (_hiddenWeights[l] * (_hiddenStepValues[sequencePosition - 1][l] * _variationalDropoutMasks[l].Array())) + _biasesRecurrentHidden[l].Vec();
 				else XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]) + _biasesRecurrentHidden[l].Vec();
 			}
 		}
@@ -1273,7 +1274,7 @@ void UserSimulator::ForwardPropBiRNN(CUDAMatrix onehotEncodedInput, int sequence
 				//XHCurrentTimeStep = XI + (_hiddenWeights[l] * _hiddenStepValues[sequencePosition - 1][l]);
 
 				//seperate bias for recurrent connection
-				if (trainMode && _useRecurrentDropout) XHCurrentTimeStep = XI + (_hiddenWeightsBack[l] * (_hiddenStepValuesBack.front()[l] * _dropoutRecurrentMasks[l].Array())) + _biasesRecurrentHiddenBack[l].Vec();
+				if (trainMode && _useRecurrentDropout) XHCurrentTimeStep = XI + (_hiddenWeightsBack[l] * (_hiddenStepValuesBack.front()[l] * _variationalDropoutMasks[l].Array())) + _biasesRecurrentHiddenBack[l].Vec();
 				else XHCurrentTimeStep = XI + (_hiddenWeightsBack[l] * _hiddenStepValuesBack.front()[l]) + _biasesRecurrentHiddenBack[l].Vec();
 			}
 		}
@@ -1330,8 +1331,7 @@ void UserSimulator::ForwardPropBiRNN(CUDAMatrix onehotEncodedInput, int sequence
 		//activatedHiddenLayer = normalizedLayer.Activate(_hiddenLayerNeuronsActivationFuncs[l]);
 
 		activatedHiddenLayer = XHCurrentTimeStep.Activate(_hiddenLayerNeuronsActivationFuncs[l]);
-		if (trainMode && _useDropout) allHiddenLayers.push_back(activatedHiddenLayer * _dropoutMasks[l].Array());
-		else allHiddenLayers.push_back(activatedHiddenLayer);
+		allHiddenLayers.push_back(activatedHiddenLayer);
 	}
 
 	if (forwardDirection) _hiddenStepValues.push_back(allHiddenLayers);
@@ -1743,8 +1743,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 	_updateGateValues.clear();
 	_candidateActivationValues.clear();
 	_hiddenStepValuesCombined.clear();
-	_dropoutMasks.clear();
-	_dropoutRecurrentMasks.clear();
+	_variationalDropoutMasks.clear();
 	_oneHotEncodedClicks = onehotEncodedLabels;
 	std::vector<CUDAMatrix> oheLabelsRev = onehotEncodedLabels;
 	std::reverse(oheLabelsRev.begin(), oheLabelsRev.end());
@@ -1764,24 +1763,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 
 	if (trainMode)
 	{
-		for (int i = 0; i < _hiddenLayerNeurons.size(); i++) {
-			CUDAMatrix mask = CUDAMatrix::One(_hiddenLayerNeurons[i], _batchSize);
-			for (int j = 0; j < mask.GetColumns(); j++) {
-				for (int k = 0; k < mask.GetRows(); k++) {
-					// different for every sample in batch
-					double isDropout = unif(re);
-					if (isDropout < _dropoutRecurrentRate) {
-						mask(k, j) = 0.0;
-					}
-					else {
-						// scale other inputs to account for dropped out neurons
-						mask(k, j) = mask(k, j) * (1.0 / (1.0 - _dropoutRecurrentRate));
-					}
-				}
-			}
-			_dropoutRecurrentMasks.push_back(mask);
-		}
-
+		// same mask across all timesteps
 		for (int i = 0; i < _hiddenLayerNeurons.size(); i++) {
 			CUDAMatrix mask = CUDAMatrix::One(_hiddenLayerNeurons[i], _batchSize);
 			for (int j = 0; j < mask.GetColumns(); j++) {
@@ -1797,7 +1779,7 @@ std::deque<std::tuple<int, double>> UserSimulator::PredictNextClickFromSequence(
 					}
 				}
 			}
-			_dropoutMasks.push_back(mask);
+			_variationalDropoutMasks.push_back(mask);
 		}
 	}
 

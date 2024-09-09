@@ -150,8 +150,7 @@ private:
 	std::vector<CUDAMatrix> _oneHotEncodedClicks;
 	std::vector<CUDAMatrix> _oneHotEncodedClicksReversed;
 
-	std::vector<CUDAMatrix> _dropoutRecurrentMasks;
-	std::vector<CUDAMatrix> _dropoutMasks;
+	std::vector<CUDAMatrix> _variationalDropoutMasks;
 
 	double _totalLoss;
 	double _totalLossGeneral;
@@ -175,7 +174,6 @@ private:
 	int _totalNumberOfSamples;
 
 	double _dropoutRate;
-	double _dropoutRecurrentRate;
 
 	bool _useDropout;
 	bool _useRecurrentDropout;
@@ -210,10 +208,8 @@ private:
 		ar& _momentumCoefficient;
 		ar& _commandIDsMap;
 		ar& _totalNumberOfSamples;
-		ar& _dropoutRecurrentRate;
 		ar& _dropoutRate;
 		ar& _isBiRNN;
-		ar& _dropoutRecurrentMasks;
-		ar& _dropoutMasks;
+		ar& _variationalDropoutMasks;
 	}
 };
