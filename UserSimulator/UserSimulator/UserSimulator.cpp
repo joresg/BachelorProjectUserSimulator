@@ -218,10 +218,12 @@ int main() {
 		double lastLR = 0;
 		bool lrWarmup = true;
 		bool useLRDecay = true;
-		int lrWarmupSteps = 100;
+		int lrWarmupSteps = 500;
 		double lrWarmupStepIncrease = 0;
-		bool normalizeClassWeights = true;
-		bool useCurriculumLearning = false;
+		bool useCurriculumLearning = true;
+		bool useDropout = true;
+		bool useRecurrentDropout = true;
+		bool useWeightedLoss = true;
 		// learning rate, hidden units, seq length, batch size
 		for (const auto& paramCombo : paramGridSearch->HyperParameterGridSearch()) {
 
@@ -288,6 +290,8 @@ int main() {
 			userSimulator->SetCmdIDsMap(commandIDsMap);
 			userSimulator->SetGradientClippingThreshold(10);
 			userSimulator->SetTotalNumberOfSamples(samplesCnt);
+			userSimulator->SetUseDropout(useDropout, useRecurrentDropout);
+			userSimulator->SetUseWeightedLoss(useWeightedLoss);
 
 			CUDAMatrix classWeights(allClasses, 1);
 			double classWeightsMin = DBL_MAX;
@@ -301,9 +305,9 @@ int main() {
 			}
 
 			double shiftLow = 1.0;
-			double shiftHigh = 3.0;
+			double shiftHigh = 2.0;
 
-			if (normalizeClassWeights)
+			if (useWeightedLoss)
 			{
 				// normalize between shiftLow and shiftHigh
 				for (int i = 0; i < classWeights.GetRows(); i++) {
@@ -439,8 +443,8 @@ int main() {
 							}
 							break;
 						}
-						else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 3 || currentLoss < 0.1 || currentEpoch > 10) {
-							if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 3 || currentLoss < 0.1 || currentEpoch > 10)
+						else if (currentLoss > maxAccAchieved * 0.92 && currentEpoch - maxAccEpoch > 3 || currentLoss < 0.1 || currentEpoch > 6) {
+							if (loweredLearningRate && currentEpoch - loweredLearningRateEpoch > 3 || currentLoss < 0.1 || currentEpoch > 6)
 							{
 								printf("learning converged....\n");
 
@@ -491,7 +495,7 @@ int main() {
 			userSimulator->SetLearningRate(lastLR);
 			userSimulator->SetValidationSet(validationSet);
 
-			if (normalizeClassWeights)
+			if (useWeightedLoss)
 			{
 				shiftLow = 1.0;
 				shiftHigh = 2.0;
@@ -627,7 +631,7 @@ int main() {
 		//SerializeModel(bestModel);
 	}
 	else {
-		std::string fileName = "..\\SavedModelParameters\\user_simulator_X.dat";
+		std::string fileName = "..\\SavedModelParameters\\user_simulator_allSequences.txt_5.dat";
 
 		std::ifstream file(fileName);
 
@@ -639,6 +643,7 @@ int main() {
 			ia >> bestModel;
 			allClasses = bestModel->GetAllClasses();
 		}
+		else printf("couldn't load model parameters...\n");
 	}
 
 	crow::SimpleApp app;
@@ -683,7 +688,7 @@ UserSimulator::UserSimulator(){
 
 UserSimulator::UserSimulator(bool isBiRNN, int inputNeurons, std::vector<std::tuple<int, LayerActivationFuncs>> hiddenLayerNeurons, int outputNeurons, double learningRate, int batchSize, int trainingSeqLength) : 
 	_weightsOutput(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1]) * (isBiRNN ? 2 : 1)), _weightsOutputBack(outputNeurons, std::get<0>(hiddenLayerNeurons[hiddenLayerNeurons.size() - 1])),
-	_batchSize(batchSize), _allTrainingExamplesCount(-1), _gradientClippingThresholdMax(5), _gradientClippingThresholdMin(0.1), _totalNumberOfSamples(-1), _modelAccuracy(DBL_MAX), _dropoutRate(0.2), 
+	_batchSize(batchSize), _allTrainingExamplesCount(-1), _gradientClippingThresholdMax(10), _gradientClippingThresholdMin(10), _totalNumberOfSamples(-1), _modelAccuracy(DBL_MAX), _dropoutRate(0.1), 
 	_isBiRNN(isBiRNN), _useDropout(true), _useRecurrentDropout(true) {
 
 	_gatedUnits = NoGates;
@@ -1491,7 +1496,7 @@ void UserSimulator::BackPropBiRNN(std::vector<CUDAMatrix> oneHotEncodedLabels, d
 	for (int t = _outputValuesCombined.size() - 1; t >= 0; t--) {
 		// Cross-entropy loss gradient w.r.t. softmax input
 		CUDAMatrix outputGrad = _outputValuesCombined[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
-		outputGrad = outputGrad * _weightsForClasses.Vec();
+		if(_useWeightedLoss) outputGrad = outputGrad * _weightsForClasses.Vec();
 
 		//CUDAMatrix outputGrad = _outputValuesCombined[t] - (oneHotEncodedLabels[t + 1] * _weightsForClasses.Vec()); // Gradient of softmax + cross-entropy
 
@@ -1559,7 +1564,7 @@ void UserSimulator::BackPropBiRNN(std::vector<CUDAMatrix> oneHotEncodedLabels, d
 	for (int t = 0; t < _outputValuesCombined.size() - 1; t++) {
 		// Cross-entropy loss gradient w.r.t. softmax input
 		CUDAMatrix outputGrad = _outputValuesCombined[t] - oneHotEncodedLabels[t + 1]; // Gradient of softmax + cross-entropy
-		outputGrad = outputGrad * _weightsForClasses.Vec();
+		if (_useWeightedLoss) outputGrad = outputGrad * _weightsForClasses.Vec();
 
 		//CUDAMatrix outputGrad = _outputValuesCombined[t] - (oneHotEncodedLabels[t + 1] * _weightsForClasses.Vec()); // Gradient of softmax + cross-entropy
 

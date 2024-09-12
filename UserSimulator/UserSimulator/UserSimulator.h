@@ -84,6 +84,8 @@ public:
 	void SetTotalNumberOfSamples(int numOfSamples) { _totalNumberOfSamples = numOfSamples; }
 	CUDAMatrix GetWeightsForClasses() { return _weightsForClasses; }
 	void SetWeightsForClasses(CUDAMatrix classWeights) { _weightsForClasses = classWeights; }
+	void SetUseDropout(bool useDropout, bool useRecurrentDropout) { _useDropout = useDropout, _useRecurrentDropout = useRecurrentDropout; }
+	void SetUseWeightedLoss(bool useWeightedLoss) { _useWeightedLoss = useWeightedLoss; }
 
 private:
 	friend class boost::serialization::access;
@@ -177,6 +179,7 @@ private:
 
 	bool _useDropout;
 	bool _useRecurrentDropout;
+	bool _useWeightedLoss;
 
 	template<class Archive>
 	void serialize(Archive& ar, const unsigned int version) {

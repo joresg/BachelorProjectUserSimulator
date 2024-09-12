@@ -3,10 +3,10 @@
 
 
 HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
-	//_learningRate.push_back(0.05);
 	_learningRate.push_back(0.01);
 	_learningRate.push_back(0.005);
 	_learningRate.push_back(0.001);
+	_learningRate.push_back(0.0001);
 
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination1;
 	std::vector<std::tuple<int, LayerActivationFuncs>> hiddenNeuronsCombination2;
@@ -67,10 +67,10 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 
 	hiddenNeuronsCombination2.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
 
-	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
-	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
-	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
-	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount2, tanhAct));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhAct));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhAct));
+	hiddenNeuronsCombination1.push_back(std::make_tuple(hiddenNuronsCount1, tanhAct));
 
 	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount2, tanhA));
 	hiddenNeuronsCombination3.push_back(std::make_tuple(hiddenNuronsCount1, tanhA));
@@ -104,7 +104,8 @@ HyperParamGrid::HyperParamGrid(int allClasses, GatedUnits gatedCells) {
 	_batchSize.push_back(256);
 	_batchSize.push_back(128);
 	_batchSize.push_back(64);
-	_batchSize.push_back(8);
+	_batchSize.push_back(32);
+	//_batchSize.push_back(8);
 }
 
 std::vector<std::tuple<double, std::vector<std::tuple<int, LayerActivationFuncs>>, int, int>> HyperParamGrid::HyperParameterGridSearch() {

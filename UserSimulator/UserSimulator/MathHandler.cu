@@ -105,7 +105,7 @@ __global__ void actFuncKernel(double* d_matrix, int width, int height, LayerActi
         int idx = y * width + x;
         if (fn == tanhAct) d_matrix[idx] = tanh(d_matrix[idx]);
         else if (fn == reluAct) d_matrix[idx] = fmax(0.0, d_matrix[idx]);
-        else if (fn == leakyReLU) d_matrix[idx] = d_matrix[idx] > 0 ? d_matrix[idx] : 0.02 * d_matrix[idx];
+        else if (fn == leakyReLU) d_matrix[idx] = d_matrix[idx] > 0 ? d_matrix[idx] : 0.01 * d_matrix[idx];
         else if (fn == sigAct) d_matrix[idx] = 1 / (1 + exp(-d_matrix[idx]));
     }
 }
@@ -164,7 +164,7 @@ __global__ void matrixElementWiseKernel(double* A, double constValue, double* C,
         else if (op == SquaredSubstractInvert) C[index] = -(pow(A[index], 2) - constValue);
         else if (op == Exp) C[index] = std::exp(A[index]);
         else if (op == ReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.0;
-        else if (op == LeakyReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.02;
+        else if (op == LeakyReLUDerivative) C[index] = A[index] > 0.0 ? 1.0 : 0.01;
         else if (op == SigmoidDerivative) {
             double sigmoid = 1.0 / (1.0 + exp(-A[index]));
             C[index] = sigmoid * (1.0 - sigmoid);
